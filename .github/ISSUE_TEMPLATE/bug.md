@@ -1,5 +1,5 @@
 ---
-name: 不具合
+name: 不具合 (Bug)
 about: 期待どおりに動かないことを報告する
 title: ''
 labels: ''
