@@ -1,0 +1,38 @@
+# Pull Request ごとに、BatonKit のテストと BatonMac のビルドを自動で実行する。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同じブランチに新しい push が来たら、実行中の古い CI は止める
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test BatonKit
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+
+      # 手元の開発環境と同じ Xcode を使う（何も指定しないと、実行環境の標準の Xcode になる）
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
+      - name: Run tests
+        run: swift test --package-path Packages/BatonKit
+
+  build:
+    name: Build BatonMac
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
+      - name: Build BatonMac
+        run: xcodebuild -project Baton.xcodeproj -scheme BatonMac -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO
