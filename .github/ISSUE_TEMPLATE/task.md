@@ -1,5 +1,5 @@
 ---
-name: 作業
+name: 作業 (Task)
 about: 機能の追加や改善など、やることを書く
 title: ''
 labels: ''
