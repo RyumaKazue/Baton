@@ -1,8 +1,8 @@
 ---
 name: 作業
 about: 機能の追加や改善など、やることを書く
-title: ""
-labels: ""
+title: ''
+labels: ''
 ---
 
 ## 目的
