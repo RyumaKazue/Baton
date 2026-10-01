@@ -1,6 +1,6 @@
 # Baton 仕様書（Bluetooth接続切り替えアプリ）
 
-最終更新：2026-09-29
+最終更新：2026-10-01
 
 MVPの範囲は [mvp.md](mvp.md) を参照。
 
@@ -337,13 +337,14 @@ Baton/
 
 ### 14.1 実機での検証が必要なもの
 
-| 項目 | 内容 | 検証する時期 |
+| 項目 | 内容 | 状態 |
 |---|---|---|
-| IOBluetoothで音声までつながるか | `openConnection()` で、機器の音声（A2DPなど）まで接続されるか | MVPの最初 |
-| IOBluetoothをSandboxの中で使えるか | Bluetoothのentitlementを付ければ、機器の一覧取得・接続・切断ができるか | MVPの最初 |
-| TLS-PSKが使えるか | Network framework の `sec_protocol_options_add_pre_shared_key` で、macOS 26・iOS 26でTLS-PSK通信ができるか | 通信を作るとき |
-| ローカルネットワークの許可 | Bonjour・TCP通信の初回に出る許可ダイアログと、拒否されたときの動き | 通信を作るとき |
-| iPhoneの出力先の照合 | `AVAudioSessionPortDescription.uid` に含まれるBluetoothアドレスで照合できるか（シミュレータ不可） | iPhoneアプリを作るとき |
+| IOBluetoothで音声までつながるか | `openConnection()` で、機器の音声（A2DPなど）まで接続されるか | ✅ 検証済み。つながる。ただし接続前の出力先によっては、出力先が自動で切り替わらない（[検証結果](spikes/iobluetooth.md) 4.2） |
+| IOBluetoothをSandboxの中で使えるか | Bluetoothのentitlementを付ければ、機器の一覧取得・接続・切断ができるか | ✅ 検証済み。使える。権限がないと一覧が空になる（[検証結果](spikes/iobluetooth.md) 4.3） |
+| スリープ中のBluetoothの接続 | スリープ中も、ヘッドホンがつながったままか | ⚠️ 短時間（19秒）ではつながったままだった。長時間はフェーズ8で確かめる（[検証結果](spikes/iobluetooth.md) 4.4） |
+| TLS-PSKが使えるか | Network framework の `sec_protocol_options_add_pre_shared_key` で、macOS 14・iOS 17 以上でTLS-PSK通信ができるか | 未検証（通信を作るとき） |
+| ローカルネットワークの許可 | Bonjour・TCP通信の初回に出る許可ダイアログと、拒否されたときの動き | 未検証（通信を作るとき） |
+| iPhoneの出力先の照合 | `AVAudioSessionPortDescription.uid` に含まれるBluetoothアドレスで照合できるか（シミュレータ不可）。アドレスの表記の違いに注意（[検証結果](spikes/iobluetooth.md) 4.1） | 未検証（iPhoneアプリを作るとき） |
 
 ### 14.2 決める必要があるもの
 
@@ -366,3 +367,4 @@ Baton/
 | 2026-09-27 | ドラフト作成 |
 | 2026-09-28 | 切断時の通知を追加。応答の待ち時間を設定値に。iPhoneの表示名を追加し、iPhoneの設定項目を決定。接続状態の確認はMacのみとし「iPhoneに接続中」エラーを削除。応答なしの扱い（6.3）、Macの表示名（5.3）、登録機器の統合（5.4）、スリープ設定を機器ごとに変更、配布方法（12）、将来の鍵交換（9）を追加 |
 | 2026-09-29 | 最後に確認できた状態の表示（6.5）を追加。機器ごとのまとめの行、端末ごとの記録の更新、スリープ前の知らせ（sleep）を定義。動作環境を macOS 14 以上・iOS 17 以上に決定。status・disconnect をBluetoothアドレス指定に変更。App SandboxはONに決定。アプリ名を Baton に決定。開発構成（13）を追加。Bonjourのサービスタイプを決定。未決事項（14）を洗い出し直し。MVPを [mvp.md](mvp.md) に分離 |
+| 2026-10-01 | IOBluetooth の技術検証の結果を 14.1 に反映（[検証結果](spikes/iobluetooth.md)） |
