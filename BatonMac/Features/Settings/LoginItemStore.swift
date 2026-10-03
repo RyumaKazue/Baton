@@ -1,12 +1,13 @@
 import Observation
 import ServiceManagement
 
-/// ログイン時の自動起動（システム設定の「ログイン項目」への登録）を扱う。
+/// ログイン時の自動起動（システム設定の「ログイン項目」への登録）の状態を持ち、画面に伝える。
+/// DeviceStore と同じく、画面と下の層（ここでは Apple の SMAppService）の間に入る「状態を持つ部品」。
 ///
 /// macOS 13 から使える SMAppService を使う。`SMAppService.mainApp` は「このアプリ自身」を表し、
 /// register() でログイン項目に登録、unregister() で解除する。
 @Observable
-final class LoginItemController {
+final class LoginItemStore {
     /// 今の登録状態。画面はこの値を見て表示を切り替える
     private(set) var status: SMAppService.Status
     /// 登録・解除に失敗したときに表示するメッセージ
