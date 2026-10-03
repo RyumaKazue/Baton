@@ -1,4 +1,4 @@
-# Pull Request ごとに、BatonKit のテストと BatonMac のビルドを自動で実行する。
+# Pull Request ごとに、BatonKit のテストと、BatonMac のビルド・テストを自動で実行する。
 name: CI
 
 on:
@@ -34,5 +34,7 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode_26.3.app
 
-      - name: Build BatonMac
-        run: xcodebuild -project Baton.xcodeproj -scheme BatonMac -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO
+      # test はビルドも含む。BatonMac スキームのテスト（BatonKitTests と BatonMacTests）も実行する。
+      # ジョブ名（Build BatonMac）は main の保護で必須のチェックになっているので変えない
+      - name: Build and test BatonMac
+        run: xcodebuild -project Baton.xcodeproj -scheme BatonMac -destination 'platform=macOS' test CODE_SIGNING_ALLOWED=NO
