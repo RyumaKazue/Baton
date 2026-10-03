@@ -40,6 +40,16 @@
                ReferencedContainer = "container:Packages/BatonKit">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "1A5E00000000000000000001"
+               BuildableName = "BatonMacTests.xctest"
+               BlueprintName = "BatonMacTests"
+               ReferencedContainer = "container:Baton.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

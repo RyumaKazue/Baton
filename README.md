@@ -38,6 +38,7 @@ iPhone アプリ（Mac から iPhone への切り替え）は、MVP の後に開
 Baton/
 ├── Baton.xcodeproj           # Xcode のプロジェクト（ターゲット：BatonMac、BatonPhone）
 ├── BatonMac/                 # Mac アプリ
+├── BatonMacTests/            # Mac アプリのテスト
 ├── BatonPhone/               # iPhone アプリ
 ├── Packages/BatonKit/        # Mac と iPhone で共通のコード（Swift Package）
 │   ├── Sources/BatonKit/
@@ -69,7 +70,7 @@ Xcode で、ターゲット（BatonMac、BatonPhone）の **Signing & Capabiliti
 |---|---|
 | ビルド | スキーム `BatonMac`、実行先 `My Mac` を選んで **⌘B** |
 | 実行 | **⌘R**（停止は **⌘.**） |
-| テスト | スキーム `BatonMac` を選んで **⌘U**（BatonKit のテストが実行される） |
+| テスト | スキーム `BatonMac` を選んで **⌘U**（BatonKit と Mac アプリのテストが実行される） |
 
 ### ターミナルで行う場合
 
@@ -79,17 +80,27 @@ Xcode で、ターゲット（BatonMac、BatonPhone）の **Signing & Capabiliti
 xcodebuild -project Baton.xcodeproj -scheme BatonMac -destination 'platform=macOS' build
 ```
 
-テスト：
+テスト（BatonKit と Mac アプリ）：
+
+```bash
+xcodebuild -project Baton.xcodeproj -scheme BatonMac -destination 'platform=macOS' test
+```
+
+テスト（BatonKit だけ）：
 
 ```bash
 swift test --package-path Packages/BatonKit
 ```
 
+### ダミーの Bluetooth で動かす
+
+スキーム `BatonMac (Mock)` で実行すると、本物の Bluetooth の代わりに、ダミーの機器を使って動きます（イヤホンがなくても画面を確かめられます）。
+
 ## 開発の進め方
 
 - 作業は Issue ごとにブランチを作り、Pull Request でマージします（`main` は保護されていて、直接 push できません）
 - ブランチ名は `feature/<Issue番号>-<内容>`（機能の追加）、`fix/<内容>`（不具合の修正）の形にします
-- Pull Request を作ると、CI（GitHub Actions）で BatonKit のテストと BatonMac のビルドが自動で実行されます。CI が成功しないとマージできません
+- Pull Request を作ると、CI（GitHub Actions）で BatonKit のテストと、BatonMac のビルド・テストが自動で実行されます。CI が成功しないとマージできません
 
 ## ドキュメント
 
