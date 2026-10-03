@@ -8,8 +8,16 @@ struct MenuContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Baton")
-                .font(.headline)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Baton")
+                    .font(.headline)
+                if BluetoothServiceFactory.usesMock {
+                    // 本物のイヤホンを操作していないことが一目で分かるようにする
+                    Text("ダミーの Bluetooth で動作中")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
 
             Divider()
 
