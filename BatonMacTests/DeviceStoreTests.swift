@@ -10,6 +10,7 @@ struct DeviceStoreTests {
     /// ダミーの機器のアドレス（MockBluetoothService が持っているもの）
     let headphones = BluetoothAddress("00:00:00:00:00:01")!  // 最初から接続中
     let earphones = BluetoothAddress("00:00:00:00:00:02")!   // 最初は未接続
+    let speaker = BluetoothAddress("00:00:00:00:00:03")!     // 接続すると必ず失敗する
 
     let bluetooth = MockBluetoothService(connectionDelay: .zero, disconnectionDelay: .zero)
     /// テストごとに別の保存先を使い、本物の設定やほかのテストに影響しないようにする
@@ -116,5 +117,73 @@ struct DeviceStoreTests {
         let unknown = BluetoothAddress("AA:BB:CC:DD:EE:FF")!
         #expect(store.isMissingFromPairedDevices(unknown))
         #expect(!store.isMissingFromPairedDevices(earphones))
+    }
+
+    // MARK: - 接続・切断
+
+    @Test("接続すると、接続中になる")
+    func connect() async {
+        let store = makeStore()
+        await store.connect(earphones)
+
+        #expect(store.isConnected(earphones))
+        #expect(store.operation(for: earphones) == nil)
+        #expect(store.errorMessage(for: earphones) == nil)
+    }
+
+    @Test("切断すると、未接続になる")
+    func disconnect() async {
+        let store = makeStore()
+        await store.disconnect(headphones)
+
+        #expect(!store.isConnected(headphones))
+        #expect(store.operation(for: headphones) == nil)
+    }
+
+    @Test("接続に失敗すると、メッセージが残り、未接続のまま")
+    func connectFailure() async throws {
+        let store = makeStore()
+        store.register(try pairedDevice(speaker))
+        await store.connect(speaker)
+
+        #expect(!store.isConnected(speaker))
+        #expect(store.operation(for: speaker) == nil)
+        let message = try #require(store.errorMessage(for: speaker))
+        #expect(message.hasPrefix("ダミー スピーカー（接続に失敗する）に接続できませんでした"))
+    }
+
+    @Test("ペアリング済みの一覧にない機器に接続すると、ペアリングされていないというメッセージになる")
+    func connectUnknownDevice() async throws {
+        let store = makeStore()
+        let unknown = BluetoothAddress("AA:BB:CC:DD:EE:FF")!
+        await store.connect(unknown)
+
+        let message = try #require(store.errorMessage(for: unknown))
+        #expect(message == "AA:BB:CC:DD:EE:FFはこの Mac とペアリングされていません")
+    }
+
+    @Test("次の操作が成功すると、前のエラーメッセージは消える")
+    func successClearsPreviousError() async {
+        let store = makeStore()
+        await store.connect(speaker)  // 失敗する
+        #expect(store.errorMessage(for: speaker) != nil)
+
+        await store.disconnect(speaker)  // 未接続なので、何もせずに成功する
+        #expect(store.errorMessage(for: speaker) == nil)
+    }
+
+    @Test("接続・切断の途中は、操作中になる")
+    func operationInProgress() async {
+        // 接続に時間がかかる偽物を使い、途中の状態を確かめる
+        let slowBluetooth = MockBluetoothService(connectionDelay: .milliseconds(200), disconnectionDelay: .zero)
+        let store = DeviceStore(bluetooth: slowBluetooth, defaults: defaults)
+
+        let task = Task { await store.connect(earphones) }
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(store.operation(for: earphones) == .connecting)
+
+        await task.value
+        #expect(store.operation(for: earphones) == nil)
+        #expect(store.isConnected(earphones))
     }
 }

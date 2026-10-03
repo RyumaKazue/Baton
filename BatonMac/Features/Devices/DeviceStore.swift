@@ -16,6 +16,10 @@ final class DeviceStore {
     private(set) var pairedDevices: [BluetoothDeviceInfo] = []
     /// この Mac に接続している音声機器
     private(set) var connectedAddresses: Set<BluetoothAddress> = []
+    /// 接続・切断の途中の機器（画面で「接続中…」などを表示し、ボタンを押せなくするのに使う）
+    private(set) var operations: [BluetoothAddress: DeviceOperation] = [:]
+    /// 接続・切断に失敗したときのメッセージ（機器ごと）
+    private(set) var errorMessages: [BluetoothAddress: String] = [:]
 
     // 画面に知らせる必要のないものは、@ObservationIgnored で変化を追いかけないようにする
     @ObservationIgnored private let bluetooth: any BluetoothService
@@ -49,6 +53,16 @@ final class DeviceStore {
         connectedAddresses.contains(address)
     }
 
+    /// 接続・切断の途中なら、その操作を返す
+    func operation(for address: BluetoothAddress) -> DeviceOperation? {
+        operations[address]
+    }
+
+    /// 最後の接続・切断に失敗していれば、そのメッセージを返す
+    func errorMessage(for address: BluetoothAddress) -> String? {
+        errorMessages[address]
+    }
+
     /// 登録しているが、今はペアリング済みの一覧に見つからない機器か（Mac とのペアリングを解除した場合など）
     func isMissingFromPairedDevices(_ address: BluetoothAddress) -> Bool {
         !pairedDevices.contains { $0.address == address }
@@ -77,7 +91,64 @@ final class DeviceStore {
         saveRegisteredDevices()
     }
 
+    /// この Mac に接続する。接続が終わるまで待つ（最大で10秒ほどかかる）
+    func connect(_ address: BluetoothAddress) async {
+        await perform(.connecting, on: address) {
+            try await bluetooth.connect(address)
+            // 変化の通知でも更新されるが、通知より先に画面に反映するため、ここでも更新する
+            connectedAddresses.insert(address)
+        }
+    }
+
+    /// この Mac から切断する。実際に切断されるまで待つ
+    func disconnect(_ address: BluetoothAddress) async {
+        await perform(.disconnecting, on: address) {
+            try await bluetooth.disconnect(address)
+            connectedAddresses.remove(address)
+        }
+    }
+
     // MARK: - 補助
+
+    /// 接続・切断の共通の流れ：操作中にする → 実行する → 失敗したらメッセージを残す → 操作中を解除する
+    private func perform(
+        _ operation: DeviceOperation,
+        on address: BluetoothAddress,
+        action: () async throws -> Void
+    ) async {
+        guard operations[address] == nil else {
+            return  // 同じ機器の操作が終わっていなければ、何もしない
+        }
+        operations[address] = operation
+        errorMessages[address] = nil
+        defer { operations[address] = nil }
+
+        do {
+            try await action()
+        } catch {
+            errorMessages[address] = Self.message(for: error, operation: operation, deviceName: name(of: address))
+        }
+    }
+
+    /// 失敗したときに表示するメッセージ（仕様書 10）
+    static func message(for error: Error, operation: DeviceOperation, deviceName: String) -> String {
+        if case BluetoothError.deviceNotFound = error {
+            return "\(deviceName)はこの Mac とペアリングされていません"
+        }
+        switch operation {
+        case .connecting:
+            return "\(deviceName)に接続できませんでした。機器の電源と距離、ほかの端末（iPhoneなど）で使用中でないか確認してください"
+        case .disconnecting:
+            return "\(deviceName)の切断に失敗しました"
+        }
+    }
+
+    /// 表示用の機器の名前（登録機器の名前 → ペアリング済みの機器の名前 → アドレスの順に探す）
+    private func name(of address: BluetoothAddress) -> String {
+        registeredDevices.first { $0.address == address }?.name
+            ?? pairedDevices.first { $0.address == address }?.name
+            ?? address.rawValue
+    }
 
     private func handle(_ event: BluetoothEvent) {
         switch event {
@@ -104,4 +175,10 @@ final class DeviceStore {
         }
         return devices
     }
+}
+
+/// 機器に対して実行中の操作
+enum DeviceOperation: Equatable {
+    case connecting
+    case disconnecting
 }
