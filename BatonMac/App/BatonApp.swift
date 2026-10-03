@@ -6,14 +6,14 @@ import SwiftUI
 @main
 struct BatonApp: App {
     // アプリ全体で1つだけ必要な状態は、ここで作って画面に渡す
-    @State private var loginItem = LoginItemController()
+    @State private var loginItemStore = LoginItemStore()
     // BluetoothService は、ここで1回だけ作る（作るたびに Bluetooth の通知が登録されるため）
     @State private var deviceStore = DeviceStore(bluetooth: BluetoothServiceFactory.make())
 
     var body: some Scene {
         MenuBarExtra("Baton", systemImage: "headphones") {
             MenuContentView()
-                .environment(loginItem)
+                .environment(loginItemStore)
                 .environment(deviceStore)
         }
         // .window：メニューを普通のメニューではなく、小さなウィンドウ（ポップオーバー）として表示する。

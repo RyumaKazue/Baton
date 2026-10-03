@@ -5,7 +5,7 @@ import SwiftUI
 /// 登録機器の一覧（フェーズ3）や接続状態（フェーズ6）は、この画面に追加していく。
 struct MenuContentView: View {
     /// BatonApp で作って渡している、ログイン項目の状態
-    @Environment(LoginItemController.self) private var loginItem
+    @Environment(LoginItemStore.self) private var loginItemStore
     /// BatonApp で作って渡している、登録機器と接続状態
     @Environment(DeviceStore.self) private var deviceStore
     /// ウィンドウ（登録画面）を開くための機能
@@ -44,7 +44,7 @@ struct MenuContentView: View {
         .frame(width: 280, alignment: .leading)
         .onAppear {
             // システム設定で直接変えられていることもあるので、表示のたびに取り直す
-            loginItem.refresh()
+            loginItemStore.refresh()
         }
     }
 
@@ -85,24 +85,24 @@ struct MenuContentView: View {
     @ViewBuilder
     private var loginItemSection: some View {
         Toggle("ログイン時に起動", isOn: Binding(
-            get: { loginItem.isEnabled },
-            set: { loginItem.setEnabled($0) }
+            get: { loginItemStore.isEnabled },
+            set: { loginItemStore.setEnabled($0) }
         ))
         .toggleStyle(.switch)
 
-        if loginItem.requiresApproval {
+        if loginItemStore.requiresApproval {
             VStack(alignment: .leading, spacing: 4) {
                 Text("システム設定で許可が必要です")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Button("システム設定を開く") {
-                    loginItem.openSystemSettings()
+                    loginItemStore.openSystemSettings()
                 }
                 .font(.caption)
             }
         }
 
-        if let message = loginItem.errorMessage {
+        if let message = loginItemStore.errorMessage {
             Text(message)
                 .font(.caption)
                 .foregroundStyle(.red)
@@ -112,6 +112,6 @@ struct MenuContentView: View {
 
 #Preview {
     MenuContentView()
-        .environment(LoginItemController())
+        .environment(LoginItemStore())
         .environment(DeviceStore(bluetooth: MockBluetoothService()))
 }
