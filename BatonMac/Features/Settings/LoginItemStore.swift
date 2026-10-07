@@ -1,5 +1,6 @@
 import Observation
 import ServiceManagement
+import os
 
 /// ログイン時の自動起動（システム設定の「ログイン項目」への登録）の状態を持ち、画面に伝える。
 /// DeviceStore と同じく、画面と下の層（ここでは Apple の SMAppService）の間に入る「状態を持つ部品」。
@@ -39,6 +40,7 @@ final class LoginItemStore {
                 try service.unregister()
             }
         } catch {
+            Logger.app.error("ログイン項目の\(enabled ? "登録" : "解除", privacy: .public)に失敗：\(String(describing: error), privacy: .public)")
             errorMessage = enabled
                 ? "ログイン項目に登録できませんでした"
                 : "ログイン項目から削除できませんでした"
