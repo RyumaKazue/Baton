@@ -2,7 +2,7 @@ import BatonKit
 import SwiftUI
 
 /// メニューバーのアイコンをクリックしたときに表示する画面。
-/// 登録機器の一覧（フェーズ3）や接続状態（フェーズ6）は、この画面に追加していく。
+/// 他の Mac での接続状態（フェーズ6）や切り替え（フェーズ7）は、この画面に追加していく。
 struct MenuContentView: View {
     /// BatonApp で作って渡している、ログイン項目の状態
     @Environment(LoginItemStore.self) private var loginItemStore
@@ -41,15 +41,14 @@ struct MenuContentView: View {
             .keyboardShortcut("q")
         }
         .padding()
-        .frame(width: 280, alignment: .leading)
+        .frame(width: 320, alignment: .leading)
         .onAppear {
             // システム設定で直接変えられていることもあるので、表示のたびに取り直す
             loginItemStore.refresh()
         }
     }
 
-    /// 登録機器の一覧と、登録画面を開くボタン。
-    /// 接続・切断のボタンは #20 で追加する
+    /// 登録機器の一覧と、登録画面を開くボタン
     @ViewBuilder
     private var registeredDevicesSection: some View {
         if deviceStore.registeredDevices.isEmpty {
@@ -57,19 +56,9 @@ struct MenuContentView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
         } else {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 10) {
                 ForEach(deviceStore.registeredDevices) { device in
-                    HStack(spacing: 8) {
-                        Circle()
-                            .fill(deviceStore.isConnected(device.address) ? .green : .gray.opacity(0.4))
-                            .frame(width: 8, height: 8)
-                        Text(device.name)
-                            .lineLimit(1)
-                        Spacer()
-                        Text(deviceStore.isConnected(device.address) ? "接続中" : "未接続")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
+                    DeviceRowView(device: device)
                 }
             }
         }
