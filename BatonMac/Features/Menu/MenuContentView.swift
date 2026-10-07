@@ -76,13 +76,13 @@ struct MenuContentView: View {
         }
     }
 
-    /// ダミーのモードでだけ表示する、スリープと復帰を再現するボタン（実際にスリープさせずに動きを確かめるため）
+    /// ダミーのモードでだけ表示する、離れる・戻るを再現するボタン（実際にスリープやロックをせずに動きを確かめるため）
     private var mockSleepSection: some View {
-        HStack {
-            Button("スリープを再現") {
-                Task { await sleepHandler.handleWillSleep() }
+        VStack(alignment: .leading, spacing: 4) {
+            Button("離れる（スリープ・ロック）を再現") {
+                Task { await sleepHandler.handleUserLeaving() }
             }
-            Button("復帰を再現") {
+            Button("戻るを再現") {
                 Task { await sleepHandler.handleUserReturned() }
             }
         }

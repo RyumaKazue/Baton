@@ -4,7 +4,7 @@ import Testing
 @testable import Baton
 
 /// SleepHandler のテスト。
-/// スリープ・復帰の通知は偽物（MockPowerEventService）に、Bluetooth は偽物（MockBluetoothService）に差し替える。
+/// 離れた・戻ってきたの通知は偽物（MockPowerEventService）に、Bluetooth は偽物（MockBluetoothService）に差し替える。
 @MainActor
 struct SleepHandlerTests {
     let headphones = BluetoothAddress("00:00:00:00:00:01")!  // 最初から接続中
@@ -31,12 +31,12 @@ struct SleepHandlerTests {
         }
     }
 
-    // MARK: - スリープに入るとき
+    // MARK: - 離れるとき（スリープ・ロック）
 
-    @Test("スリープに入るとき、接続中の登録機器を切断して記録する")
+    @Test("離れるとき、接続中の登録機器を切断して記録する")
     func disconnectsConnectedRegisteredDevices() async throws {
         try register(headphones)
-        await sleepHandler.handleWillSleep()
+        await sleepHandler.handleUserLeaving()
 
         #expect(!deviceStore.isConnected(headphones))
         #expect(sleepHandler.devicesToReconnect == [headphones])
@@ -44,7 +44,7 @@ struct SleepHandlerTests {
 
     @Test("登録していない機器は、接続中でも切断しない")
     func keepsUnregisteredDevices() async {
-        await sleepHandler.handleWillSleep()  // ヘッドホンは接続中だが、登録していない
+        await sleepHandler.handleUserLeaving()  // ヘッドホンは接続中だが、登録していない
 
         #expect(deviceStore.isConnected(headphones))
         #expect(sleepHandler.devicesToReconnect.isEmpty)
@@ -53,9 +53,20 @@ struct SleepHandlerTests {
     @Test("未接続の登録機器は、記録しない")
     func ignoresDisconnectedRegisteredDevices() async throws {
         try register(earphones)
-        await sleepHandler.handleWillSleep()
+        await sleepHandler.handleUserLeaving()
 
         #expect(sleepHandler.devicesToReconnect.isEmpty)
+    }
+
+    @Test("ロックとスリープが続けて起きても（2回離れても）、記録は残り、戻ってきたら再接続する")
+    func leavingTwice() async throws {
+        try register(headphones)
+        await sleepHandler.handleUserLeaving()  // ロック
+        await sleepHandler.handleUserLeaving()  // 続けてスリープ
+
+        #expect(sleepHandler.devicesToReconnect == [headphones])
+        await sleepHandler.handleUserReturned()
+        #expect(deviceStore.isConnected(headphones))
     }
 
     // MARK: - ユーザーが戻ってきたとき
@@ -63,14 +74,14 @@ struct SleepHandlerTests {
     @Test("戻ってきたら、スリープ前に接続していた機器を再接続し、記録を消す")
     func reconnectsOnReturn() async throws {
         try register(headphones)
-        await sleepHandler.handleWillSleep()
+        await sleepHandler.handleUserLeaving()
         await sleepHandler.handleUserReturned()
 
         #expect(deviceStore.isConnected(headphones))
         #expect(sleepHandler.devicesToReconnect.isEmpty)
     }
 
-    @Test("スリープしていないのに画面が点いても、何もしない")
+    @Test("離れていないのに戻ってきた（画面だけが点いたなど）ときは、何もしない")
     func doesNothingWithoutSleep() async throws {
         try register(earphones)
         await sleepHandler.handleUserReturned()
@@ -81,7 +92,7 @@ struct SleepHandlerTests {
     @Test("スリープ中にヘッドホンの側からつないできた機器は、そのまま（エラーにしない）")
     func skipsAlreadyConnectedDevices() async throws {
         try register(headphones)
-        await sleepHandler.handleWillSleep()
+        await sleepHandler.handleUserLeaving()
         bluetooth.simulateExternalConnection(headphones)  // スリープ中に、ヘッドホンの電源を入れてつながった
         await sleepHandler.handleUserReturned()
 
@@ -93,7 +104,7 @@ struct SleepHandlerTests {
     func givesUpSilentlyOnFailure() async throws {
         try register(speaker)
         bluetooth.simulateExternalConnection(speaker)  // 接続中にしてからスリープする
-        await sleepHandler.handleWillSleep()
+        await sleepHandler.handleUserLeaving()
         #expect(sleepHandler.devicesToReconnect == [speaker])
 
         await sleepHandler.handleUserReturned()  // 再接続は失敗する
@@ -104,11 +115,11 @@ struct SleepHandlerTests {
 
     // MARK: - 通知とのつながり
 
-    @Test("スリープ・復帰の通知が来ると、切断と再接続が行われる")
+    @Test("離れた・戻ってきたの通知が来ると、切断と再接続が行われる")
     func respondsToPowerEvents() async throws {
         try register(headphones)
 
-        power.simulateWillSleep()
+        power.simulateUserLeaving()
         try await waitUntil { !deviceStore.isConnected(headphones) }
 
         power.simulateUserReturned()

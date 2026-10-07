@@ -3,15 +3,17 @@ import Observation
 
 /// スリープ時の切断と、復帰時の再接続を行う（仕様書 7、MVP の扱い）。
 ///
-/// - スリープに入る直前：この Mac に接続中の登録機器を切断し、「スリープ前に接続していた機器」として記録する
-/// - ユーザーが戻ってきたとき：記録した機器のうち、まだ接続していないものに接続を試す。記録は消す
+/// - ユーザーが離れるとき（スリープに入る直前、画面をロックしたとき）：
+///   この Mac に接続中の登録機器を切断し、「離れる前に接続していた機器」として記録する
+/// - ユーザーが戻ってきたとき（ロックを解除したとき、画面が点いたとき）：
+///   記録した機器のうち、まだ接続していないものに接続を試す。記録は消す
 /// - 再接続に失敗したら（他の端末で使用中など）、あきらめる。エラーメッセージは出さない
 ///
 /// MVP では他の端末に問い合わせない。他の端末で使用中なら接続が失敗するので、それであきらめる（docs/mvp.md）。
 @MainActor
 @Observable
 final class SleepHandler {
-    /// スリープ前にこの Mac が接続していた機器（復帰したら再接続する）
+    /// 離れる前にこの Mac が接続していた機器（戻ってきたら再接続する）
     private(set) var devicesToReconnect: Set<BluetoothAddress> = []
 
     @ObservationIgnored private let deviceStore: DeviceStore
@@ -21,17 +23,18 @@ final class SleepHandler {
         self.power = power
         self.deviceStore = deviceStore
 
-        power.onWillSleep = { [weak self] in
-            Task { await self?.handleWillSleep() }
+        power.onUserLeaving = { [weak self] in
+            Task { await self?.handleUserLeaving() }
         }
         power.onUserReturned = { [weak self] in
             Task { await self?.handleUserReturned() }
         }
     }
 
-    /// スリープに入る直前の処理：接続中の登録機器を切断し、記録する。
-    /// スリープまでの時間が短いので、すべての機器の切断を同時に始める
-    func handleWillSleep() async {
+    /// ユーザーが離れるときの処理：接続中の登録機器を切断し、記録する。
+    /// スリープまでの時間が短いので、すべての機器の切断を同時に始める。
+    /// 画面のロックとスリープが続けて起きて2回呼ばれても、2回目は切断する機器がないので何もしない
+    func handleUserLeaving() async {
         let connected = deviceStore.registeredDevices
             .map(\.address)
             .filter { deviceStore.isConnected($0) }
