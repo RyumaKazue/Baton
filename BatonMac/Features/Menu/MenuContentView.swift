@@ -8,6 +8,8 @@ struct MenuContentView: View {
     @Environment(LoginItemStore.self) private var loginItemStore
     /// BatonApp で作って渡している、登録機器と接続状態
     @Environment(DeviceStore.self) private var deviceStore
+    /// BatonApp で作って渡している、スリープ時の切断と復帰時の再接続
+    @Environment(SleepHandler.self) private var sleepHandler
     /// ウィンドウ（登録画面）を開くための機能
     @Environment(\.openWindow) private var openWindow
 
@@ -27,6 +29,10 @@ struct MenuContentView: View {
             Divider()
 
             registeredDevicesSection
+
+            if BluetoothServiceFactory.usesMock {
+                mockSleepSection
+            }
 
             Divider()
 
@@ -70,6 +76,19 @@ struct MenuContentView: View {
         }
     }
 
+    /// ダミーのモードでだけ表示する、離れる・戻るを再現するボタン（実際にスリープやロックをせずに動きを確かめるため）
+    private var mockSleepSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button("離れる（スリープ・ロック）を再現") {
+                Task { await sleepHandler.handleUserLeaving() }
+            }
+            Button("戻るを再現") {
+                Task { await sleepHandler.handleUserReturned() }
+            }
+        }
+        .controlSize(.small)
+    }
+
     /// 「ログイン時に起動」のオン・オフと、その補足の表示
     @ViewBuilder
     private var loginItemSection: some View {
@@ -100,7 +119,9 @@ struct MenuContentView: View {
 }
 
 #Preview {
-    MenuContentView()
+    let deviceStore = DeviceStore(bluetooth: MockBluetoothService())
+    return MenuContentView()
         .environment(LoginItemStore())
-        .environment(DeviceStore(bluetooth: MockBluetoothService()))
+        .environment(deviceStore)
+        .environment(SleepHandler(power: MockPowerEventService(), deviceStore: deviceStore))
 }
