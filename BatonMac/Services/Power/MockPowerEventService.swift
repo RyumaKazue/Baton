@@ -1,15 +1,15 @@
-/// 偽物の PowerEventService。テストで、スリープや復帰を再現するために使う。
+/// 偽物の PowerEventService。テストで、ユーザーが離れた・戻ってきたことを再現するために使う。
 @MainActor
 final class MockPowerEventService: PowerEventService {
-    var onWillSleep: (() -> Void)?
+    var onUserLeaving: (() -> Void)?
     var onUserReturned: (() -> Void)?
 
-    /// スリープに入る直前の通知を再現する
-    func simulateWillSleep() {
-        onWillSleep?()
+    /// ユーザーが離れた（スリープに入る直前、画面をロックした）ことを再現する
+    func simulateUserLeaving() {
+        onUserLeaving?()
     }
 
-    /// ユーザーが戻ってきた（画面が点いた）通知を再現する
+    /// ユーザーが戻ってきた（ロックを解除した、画面が点いた）ことを再現する
     func simulateUserReturned() {
         onUserReturned?()
     }
