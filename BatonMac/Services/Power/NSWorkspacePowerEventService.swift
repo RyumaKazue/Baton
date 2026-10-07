@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import os
 
 /// macOS の通知を使う、本物の PowerEventService。
 ///
@@ -30,22 +31,33 @@ final class NSWorkspacePowerEventService: PowerEventService {
         let distributed = DistributedNotificationCenter.default()
 
         observe(workspace, NSWorkspace.willSleepNotification) { [weak self] in
+            Logger.power.notice("スリープに入る")
             self?.onUserLeaving?()
         }
         observe(distributed, Notification.Name("com.apple.screenIsLocked")) { [weak self] in
+            Logger.power.notice("画面がロックされた")
             self?.onUserLeaving?()
         }
         observe(distributed, Notification.Name("com.apple.screenIsUnlocked")) { [weak self] in
+            Logger.power.notice("ロックが解除された")
             self?.onUserReturned?()
         }
         observe(workspace, NSWorkspace.screensDidWakeNotification) { [weak self] in
             // ロック画面のままなら、ロックの解除を待つ
-            guard !Self.isScreenLocked else { return }
+            guard !Self.isScreenLocked else {
+                Logger.power.notice("画面が点いた（ロック画面のままなので、解除を待つ）")
+                return
+            }
+            Logger.power.notice("画面が点いた")
             self?.onUserReturned?()
         }
         observe(workspace, NSWorkspace.didWakeNotification) { [weak self] in
             // ダークウェイク（画面が消えたまま）やロック画面のままなら、知らせない
-            guard Self.isDisplayAwake, !Self.isScreenLocked else { return }
+            guard Self.isDisplayAwake, !Self.isScreenLocked else {
+                Logger.power.notice("システムが起きた（画面が消えている、またはロック中なので、何もしない）")
+                return
+            }
+            Logger.power.notice("システムが起きた")
             self?.onUserReturned?()
         }
     }

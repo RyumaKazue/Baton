@@ -96,6 +96,40 @@ swift test --package-path Packages/BatonKit
 
 スキーム `BatonMac (Mock)` で実行すると、本物の Bluetooth の代わりに、ダミーの機器を使って動きます（イヤホンがなくても画面を確かめられます）。
 
+## ログを見る
+
+Baton は、macOS の統合ログにログを書き込みます（サブシステム `Kazue.Baton`）。
+
+| カテゴリ | 内容 |
+|---|---|
+| `App` | 起動（本物とダミーのどちらの Bluetooth で動いているか） |
+| `Bluetooth` | 接続・切断の開始と結果、Bluetooth の変化の通知 |
+| `Devices` | 登録・解除、接続・切断の失敗 |
+| `Power` | スリープ・ロック・画面の点灯などの通知 |
+| `Sleep` | 離れたときの切断と、戻ってきたときの再接続 |
+
+### Console.app で見る
+
+1. Console.app（コンソール）を開き、左で自分の Mac を選ぶ
+2. 右上の検索欄に `subsystem:Kazue.Baton` と入力する
+3. 「開始」を押すと、その後のログが流れる
+
+### ターミナルで見る
+
+zsh には `log` という別の組み込みコマンドがあるので、`/usr/bin/log` と書きます。
+
+これから出るログを見る：
+
+```bash
+/usr/bin/log stream --predicate 'subsystem == "Kazue.Baton"'
+```
+
+過去1時間のログを見る：
+
+```bash
+/usr/bin/log show --last 1h --predicate 'subsystem == "Kazue.Baton"'
+```
+
 ## 開発の進め方
 
 - 作業は Issue ごとにブランチを作り、Pull Request でマージします（`main` は保護されていて、直接 push できません）
