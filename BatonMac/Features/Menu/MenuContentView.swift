@@ -16,8 +16,13 @@ struct MenuContentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Baton")
-                    .font(.headline)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Baton")
+                        .font(.headline)
+                    Text(Self.version)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 if BluetoothServiceFactory.usesMock {
                     // 本物のイヤホンを操作していないことが一目で分かるようにする
                     Text("ダミーの Bluetooth で動作中")
@@ -52,6 +57,12 @@ struct MenuContentView: View {
             // システム設定で直接変えられていることもあるので、表示のたびに取り直す
             loginItemStore.refresh()
         }
+    }
+
+    /// アプリのバージョン（例：v0.1）。Info.plist の CFBundleShortVersionString（ビルド設定 MARKETING_VERSION）から読む
+    private static var version: String {
+        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+        return "v\(shortVersion)"
     }
 
     /// 登録機器の一覧と、登録画面を開くボタン
