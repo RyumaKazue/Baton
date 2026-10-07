@@ -1,6 +1,7 @@
 import BatonKit
 import Foundation
 import Observation
+import os
 
 /// 登録機器と、この Mac での接続状態を持つ。
 ///
@@ -83,12 +84,14 @@ final class DeviceStore {
         }
         registeredDevices.append(RegisteredDevice(address: device.address, name: device.name))
         saveRegisteredDevices()
+        Logger.devices.notice("登録：\(device.name, privacy: .public)（\(device.address, privacy: .public)）")
     }
 
     /// 登録を解除する
     func unregister(_ address: BluetoothAddress) {
         registeredDevices.removeAll { $0.address == address }
         saveRegisteredDevices()
+        Logger.devices.notice("登録を解除：\(address, privacy: .public)")
     }
 
     /// この Mac に接続する。接続が終わるまで待つ（最大で10秒ほどかかる）
@@ -128,6 +131,7 @@ final class DeviceStore {
         do {
             try await action()
         } catch {
+            Logger.devices.error("\(operation == .connecting ? "接続" : "切断", privacy: .public)できなかった：\(self.name(of: address), privacy: .public)、\(String(describing: error), privacy: .public)\(reportsErrors ? "" : "（メッセージは出さない）", privacy: .public)")
             guard reportsErrors else { return }
             errorMessages[address] = Self.message(for: error, operation: operation, deviceName: name(of: address))
         }
@@ -165,6 +169,7 @@ final class DeviceStore {
     /// 登録機器を JSON にして UserDefaults に保存する
     private func saveRegisteredDevices() {
         guard let data = try? JSONEncoder().encode(registeredDevices) else {
+            Logger.devices.error("登録機器を保存できなかった")
             return
         }
         defaults.set(data, forKey: Self.storageKey)
@@ -172,8 +177,11 @@ final class DeviceStore {
 
     /// UserDefaults から登録機器を読み込む。保存がない、または読めないときは空にする
     private static func loadRegisteredDevices(from defaults: UserDefaults) -> [RegisteredDevice] {
-        guard let data = defaults.data(forKey: storageKey),
-              let devices = try? JSONDecoder().decode([RegisteredDevice].self, from: data) else {
+        guard let data = defaults.data(forKey: storageKey) else {
+            return []
+        }
+        guard let devices = try? JSONDecoder().decode([RegisteredDevice].self, from: data) else {
+            Logger.devices.error("保存されていた登録機器を読み込めなかった（空の一覧で起動する）")
             return []
         }
         return devices

@@ -1,6 +1,7 @@
 import BatonKit
 import Foundation
 import IOBluetooth
+import os
 
 /// IOBluetooth を使う、本物の BluetoothService。
 ///
@@ -73,6 +74,7 @@ final class IOBluetoothService: NSObject, BluetoothService {
         guard pendingConnections[address] == nil else {
             throw BluetoothError.operationInProgress
         }
+        Logger.bluetooth.notice("接続を開始：\(address, privacy: .public)")
 
         // 「終わったら呼んでもらう」方式の API を、async で待てる形に包む
         try await withCheckedThrowingContinuation { continuation in
@@ -103,6 +105,7 @@ final class IOBluetoothService: NSObject, BluetoothService {
         guard pendingDisconnections[address] == nil else {
             throw BluetoothError.operationInProgress
         }
+        Logger.bluetooth.notice("切断を開始：\(address, privacy: .public)")
 
         try await withCheckedThrowingContinuation { continuation in
             pendingDisconnections[address] = continuation
@@ -141,8 +144,10 @@ final class IOBluetoothService: NSObject, BluetoothService {
 
         // すでに接続中だと分かっている機器なら、重なって届いた通知なので伝えない
         guard connectedAddresses.insert(address).inserted else {
+            Logger.bluetooth.debug("接続の通知（重なりのため無視）：\(address, privacy: .public)")
             return
         }
+        Logger.bluetooth.notice("接続の通知：\(device.name ?? "?", privacy: .public)（\(address, privacy: .public)）")
         onEvent?(.connected(address))
     }
 
@@ -156,8 +161,10 @@ final class IOBluetoothService: NSObject, BluetoothService {
         finishDisconnection(address, with: .success(()))
 
         guard connectedAddresses.remove(address) != nil else {
+            Logger.bluetooth.debug("切断の通知（重なりのため無視）：\(address, privacy: .public)")
             return
         }
+        Logger.bluetooth.notice("切断の通知：\(device.name ?? "?", privacy: .public)（\(address, privacy: .public)）")
         onEvent?(.disconnected(address))
     }
 
@@ -176,12 +183,30 @@ final class IOBluetoothService: NSObject, BluetoothService {
 
     /// 待っている接続の処理を終わらせる。すでに終わっていれば何もしない（完了と時間切れの、先に来た方だけが効く）
     private func finishConnection(_ address: BluetoothAddress, with result: Result<Void, Error>) {
-        pendingConnections.removeValue(forKey: address)?.resume(with: result)
+        guard let continuation = pendingConnections.removeValue(forKey: address) else {
+            return
+        }
+        Self.log("接続", address: address, result: result)
+        continuation.resume(with: result)
     }
 
     /// 待っている切断の処理を終わらせる。すでに終わっていれば何もしない
     private func finishDisconnection(_ address: BluetoothAddress, with result: Result<Void, Error>) {
-        pendingDisconnections.removeValue(forKey: address)?.resume(with: result)
+        guard let continuation = pendingDisconnections.removeValue(forKey: address) else {
+            return
+        }
+        Self.log("切断", address: address, result: result)
+        continuation.resume(with: result)
+    }
+
+    /// 接続・切断の結果をログに出す
+    private static func log(_ operation: String, address: BluetoothAddress, result: Result<Void, Error>) {
+        switch result {
+        case .success:
+            Logger.bluetooth.notice("\(operation, privacy: .public)に成功：\(address, privacy: .public)")
+        case .failure(let error):
+            Logger.bluetooth.error("\(operation, privacy: .public)に失敗：\(address, privacy: .public)、\(String(describing: error), privacy: .public)")
+        }
     }
 
     private func device(for address: BluetoothAddress) -> IOBluetoothDevice? {

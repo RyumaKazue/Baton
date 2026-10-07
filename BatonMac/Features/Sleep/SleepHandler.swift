@@ -1,5 +1,6 @@
 import BatonKit
 import Observation
+import os
 
 /// スリープ時の切断と、復帰時の再接続を行う（仕様書 7、MVP の扱い）。
 ///
@@ -39,8 +40,10 @@ final class SleepHandler {
             .map(\.address)
             .filter { deviceStore.isConnected($0) }
         guard !connected.isEmpty else {
+            Logger.sleep.notice("離れる：切断する機器なし")
             return
         }
+        Logger.sleep.notice("離れる：\(connected.map(\.rawValue).joined(separator: "、"), privacy: .public) を切断して記録する")
         // 切断より先に記録する（切断の途中でスリープに入っても、復帰したら再接続できるように）
         devicesToReconnect.formUnion(connected)
 
@@ -56,9 +59,18 @@ final class SleepHandler {
         let targets = devicesToReconnect
         // 先に記録を消す（画面の通知とシステムの通知が重なって2回呼ばれても、2回目は何もしないように）
         devicesToReconnect.removeAll()
+        guard !targets.isEmpty else {
+            Logger.sleep.debug("戻ってきた：再接続する機器なし")
+            return
+        }
+        Logger.sleep.notice("戻ってきた：\(targets.map(\.rawValue).joined(separator: "、"), privacy: .public) を再接続する")
 
-        for address in targets where !deviceStore.isConnected(address) {
+        for address in targets {
             // スリープ中にヘッドホンの側からつないできた場合は、すでに接続しているので何もしない
+            guard !deviceStore.isConnected(address) else {
+                Logger.sleep.notice("すでに接続済みなので再接続しない：\(address, privacy: .public)")
+                continue
+            }
             await deviceStore.connect(address, reportsErrors: false)
         }
     }
