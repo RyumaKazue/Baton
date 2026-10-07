@@ -1,4 +1,5 @@
 import BatonKit
+import os
 
 /// 偽物の BluetoothService（ダミーのモード）。
 ///
@@ -106,6 +107,7 @@ final class MockBluetoothService: BluetoothService {
     private func setConnected(_ connected: Bool, at index: Int) {
         devices[index].isConnected = connected
         let address = devices[index].address
+        Logger.bluetooth.notice("（ダミー）\(connected ? "接続" : "切断", privacy: .public)：\(self.devices[index].name, privacy: .public)")
         onEvent?(connected ? .connected(address) : .disconnected(address))
     }
 }

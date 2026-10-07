@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 /// アプリの入り口。
 /// Baton はメニューバーに常駐するアプリなので、メインの画面は MenuBarExtra に置く。
@@ -11,6 +12,7 @@ struct BatonApp: App {
     @State private var sleepHandler: SleepHandler
 
     init() {
+        Logger.app.notice("起動（Bluetooth：\(BluetoothServiceFactory.usesMock ? "ダミー" : "本物", privacy: .public)）")
         // BluetoothService は、ここで1回だけ作る（作るたびに Bluetooth の通知が登録されるため）
         let deviceStore = DeviceStore(bluetooth: BluetoothServiceFactory.make())
         // SleepHandler は DeviceStore を使うので、プロパティの初期値ではなく init の中で作る
