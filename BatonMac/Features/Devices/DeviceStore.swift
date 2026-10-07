@@ -92,8 +92,9 @@ final class DeviceStore {
     }
 
     /// この Mac に接続する。接続が終わるまで待つ（最大で10秒ほどかかる）
-    func connect(_ address: BluetoothAddress) async {
-        await perform(.connecting, on: address) {
+    /// - Parameter reportsErrors: false なら、失敗してもエラーメッセージを残さない（復帰時の自動の再接続など）
+    func connect(_ address: BluetoothAddress, reportsErrors: Bool = true) async {
+        await perform(.connecting, on: address, reportsErrors: reportsErrors) {
             try await bluetooth.connect(address)
             // 変化の通知でも更新されるが、通知より先に画面に反映するため、ここでも更新する
             connectedAddresses.insert(address)
@@ -114,6 +115,7 @@ final class DeviceStore {
     private func perform(
         _ operation: DeviceOperation,
         on address: BluetoothAddress,
+        reportsErrors: Bool = true,
         action: () async throws -> Void
     ) async {
         guard operations[address] == nil else {
@@ -126,6 +128,7 @@ final class DeviceStore {
         do {
             try await action()
         } catch {
+            guard reportsErrors else { return }
             errorMessages[address] = Self.message(for: error, operation: operation, deviceName: name(of: address))
         }
     }
