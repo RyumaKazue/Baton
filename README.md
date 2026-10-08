@@ -168,3 +168,6 @@ zsh には `log` という別の組み込みコマンドがあるので、`/usr/
 | [仕様書](docs/spec.md) | アプリ全体の仕様 |
 | [MVP](docs/mvp.md) | MVP の範囲 |
 | [開発計画](docs/plan.md) | MVP の開発のフェーズと進め方 |
+| [開発の状況](docs/status.md) | 今どこにいるか、次にやること、決まっていないこと |
+| [受け入れテスト](docs/acceptance-test.md) | v0.1 の受け入れテストのチェックリストと結果 |
+| [検証の記録](docs/spikes/) | IOBluetooth、スリープ時の自動接続の検証 |
