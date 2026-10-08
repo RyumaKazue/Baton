@@ -115,6 +115,104 @@ struct SleepHandlerTests {
         #expect(!deviceStore.isConnected(headphones))
     }
 
+    // MARK: - 離れている間につないできたとき
+
+    @Test("離れるときに切断する機器がなくても、離れている間になる")
+    func becomesAwayWithoutConnectedDevices() async throws {
+        try register(earphones)  // 未接続
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+
+        #expect(sleepHandler.isAway)
+    }
+
+    @Test("離れている間に登録機器がつないできたら切断し、戻ってきたら再接続する")
+    func disconnectsDevicesConnectingWhileAway() async throws {
+        try register(earphones)
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+
+        bluetooth.simulateExternalConnection(earphones)  // スリープ中に、ヘッドホンの電源を入れた
+        try await waitUntil { !deviceStore.isConnected(earphones) }
+        #expect(sleepHandler.devicesToReconnect == [earphones])
+
+        await sleepHandler.handleUserReturned()
+        #expect(deviceStore.isConnected(earphones))
+        #expect(!sleepHandler.isAway)
+    }
+
+    @Test("離れていないときにつないできた機器は、切断しない")
+    func keepsDevicesConnectingWhileNotAway() async throws {
+        try register(earphones)
+
+        bluetooth.simulateExternalConnection(earphones)
+        try await settle()
+        #expect(deviceStore.isConnected(earphones))
+    }
+
+    @Test("離れている間でも、登録していない機器は切断しない")
+    func keepsUnregisteredDevicesConnectingWhileAway() async throws {
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+
+        bluetooth.simulateExternalConnection(earphones)  // 登録していない
+        try await settle()
+        #expect(deviceStore.isConnected(earphones))
+    }
+
+    @Test("設定がオフのきっかけで離れたときは、離れている間にならず、つないできた機器を切断しない")
+    func keepsDevicesWhenLeaveSettingIsOff() async throws {
+        try register(earphones)
+        settings.disconnectsOnScreenLock = false
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+        #expect(!sleepHandler.isAway)
+
+        bluetooth.simulateExternalConnection(earphones)
+        try await settle()
+        #expect(deviceStore.isConnected(earphones))
+    }
+
+    @Test("戻ってきた後につないできた機器は、切断しない")
+    func keepsDevicesConnectingAfterReturn() async throws {
+        try register(earphones)
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+        await sleepHandler.handleUserReturned()
+
+        bluetooth.simulateExternalConnection(earphones)
+        try await settle()
+        #expect(deviceStore.isConnected(earphones))
+    }
+
+    @Test("何度もつないでくる機器は、3回切断したら切るのをやめ、戻ってきたときは接続済みなので何もしない")
+    func stopsDisconnectingAfterRepeatedConnections() async throws {
+        try register(earphones)
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+
+        for _ in 1...3 {
+            bluetooth.simulateExternalConnection(earphones)
+            try await waitUntil { !deviceStore.isConnected(earphones) }
+        }
+        bluetooth.simulateExternalConnection(earphones)  // 4回目
+        try await settle()
+        #expect(deviceStore.isConnected(earphones))
+
+        await sleepHandler.handleUserReturned()  // すでに接続済みなので、接続し直さない
+        #expect(deviceStore.isConnected(earphones))
+        #expect(deviceStore.errorMessage(for: earphones) == nil)
+    }
+
+    @Test("安全弁の回数は、戻ってきたら0に戻る")
+    func resetsLimiterOnReturn() async throws {
+        try register(earphones)
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+        for _ in 1...3 {
+            bluetooth.simulateExternalConnection(earphones)
+            try await waitUntil { !deviceStore.isConnected(earphones) }
+        }
+        await sleepHandler.handleUserReturned()  // 再接続される
+
+        await sleepHandler.handleUserLeaving(reason: .sleep)  // また離れる（ここで切断される）
+        bluetooth.simulateExternalConnection(earphones)
+        try await waitUntil { !deviceStore.isConnected(earphones) }
+    }
+
     // MARK: - ユーザーが戻ってきたとき
 
     @Test("戻ってきたら、スリープ前に接続していた機器を再接続し、記録を消す")
@@ -133,17 +231,6 @@ struct SleepHandlerTests {
         await sleepHandler.handleUserReturned()
 
         #expect(!deviceStore.isConnected(earphones))
-    }
-
-    @Test("スリープ中にヘッドホンの側からつないできた機器は、そのまま（エラーにしない）")
-    func skipsAlreadyConnectedDevices() async throws {
-        try register(headphones)
-        await sleepHandler.handleUserLeaving(reason: .sleep)
-        bluetooth.simulateExternalConnection(headphones)  // スリープ中に、ヘッドホンの電源を入れてつながった
-        await sleepHandler.handleUserReturned()
-
-        #expect(deviceStore.isConnected(headphones))
-        #expect(deviceStore.errorMessage(for: headphones) == nil)
     }
 
     @Test("再接続に失敗したら、あきらめる（エラーメッセージを出さず、次に戻ってきたときも再接続しない）")
@@ -170,6 +257,12 @@ struct SleepHandlerTests {
 
         power.simulateUserReturned()
         try await waitUntil { deviceStore.isConnected(headphones) }
+    }
+
+    /// 通知から先の処理（Task の中で動く）が終わるのを、少し待つ。
+    /// 「切断されない」ことは条件で待てないので、処理が動き終わるだけの時間を待ってから確かめる
+    private func settle() async throws {
+        try await Task.sleep(for: .milliseconds(50))
     }
 
     /// 条件が満たされるまで、少しずつ待つ（通知から先の処理は Task の中で動くため）
