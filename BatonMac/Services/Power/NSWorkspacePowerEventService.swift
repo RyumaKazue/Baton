@@ -6,22 +6,25 @@ import os
 ///
 /// | macOS の通知 | 知らせる出来事 |
 /// |---|---|
-/// | willSleepNotification（スリープに入る直前） | onUserLeaving |
-/// | com.apple.screenIsLocked（画面をロックした。電源ボタン、⌃⌘Q など） | onUserLeaving |
+/// | willSleepNotification（スリープに入る直前） | onUserLeaving(.sleep) |
+/// | com.apple.screenIsLocked（画面をロックした。電源ボタン、⌃⌘Q など） | onUserLeaving(.screenLock) |
+/// | screensDidSleepNotification（画面が消えた） | onUserLeaving(.displaySleep) |
 /// | com.apple.screenIsUnlocked（ロックを解除した） | onUserReturned |
 /// | screensDidWakeNotification（画面が点いた）で、ロックされていないとき | onUserReturned |
 /// | didWakeNotification（システムが起きた）で、画面が点いていて、ロックされていないとき | onUserReturned |
 ///
 /// - 電源ボタンを押しても、Mac はすぐにはスリープしない（画面が消えてロックされるだけ）。
-///   ヘッドホンがつながっている間は自動でもスリープしないので、ロックしたときにも切断する
+///   ヘッドホンがつながっている間は自動でもスリープしないので、スリープだけでなくロックしたときも「離れた」と知らせる
 /// - ロック画面のままや、ダークウェイクでは再接続しないように、「戻ってきた」はロックの解除を基準にする
 /// - ロックとロック解除の通知（com.apple.screenIs〜）は、Apple の公式のドキュメントには載っていない通知で、
 ///   将来の macOS で変わる可能性がある
-/// - 同じ出来事を続けて知らせることがあるが、受け取る側（SleepHandler）は2回目では何もしない
+/// - 切断するかどうかは、ここでは決めない。理由を付けて知らせ、受け取る側（SleepHandler）が設定を見て決める
+/// - 同じ出来事を続けて知らせることがあるが、受け取る側（SleepHandler）は2回目では何もしない。
+///   たとえば電源ボタンを押すと、ロックと画面の消灯が続けて届く
 /// - アプリが動いている間ずっと1つだけ使う前提なので、通知の登録は解除していない
 @MainActor
 final class NSWorkspacePowerEventService: PowerEventService {
-    var onUserLeaving: (() -> Void)?
+    var onUserLeaving: ((LeaveReason) -> Void)?
     var onUserReturned: (() -> Void)?
 
     private var observers: [NSObjectProtocol] = []
@@ -32,11 +35,15 @@ final class NSWorkspacePowerEventService: PowerEventService {
 
         observe(workspace, NSWorkspace.willSleepNotification) { [weak self] in
             Logger.power.notice("スリープに入る")
-            self?.onUserLeaving?()
+            self?.onUserLeaving?(.sleep)
         }
         observe(distributed, Notification.Name("com.apple.screenIsLocked")) { [weak self] in
             Logger.power.notice("画面がロックされた")
-            self?.onUserLeaving?()
+            self?.onUserLeaving?(.screenLock)
+        }
+        observe(workspace, NSWorkspace.screensDidSleepNotification) { [weak self] in
+            Logger.power.notice("画面が消えた")
+            self?.onUserLeaving?(.displaySleep)
         }
         observe(distributed, Notification.Name("com.apple.screenIsUnlocked")) { [weak self] in
             Logger.power.notice("ロックが解除された")
