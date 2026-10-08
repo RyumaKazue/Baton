@@ -9,15 +9,22 @@ struct BatonApp: App {
     // アプリ全体で1つだけ必要な状態は、ここで作って画面に渡す
     @State private var loginItemStore = LoginItemStore()
     @State private var deviceStore: DeviceStore
+    @State private var appSettings: AppSettings
     @State private var sleepHandler: SleepHandler
 
     init() {
         Logger.app.notice("起動（Bluetooth：\(BluetoothServiceFactory.usesMock ? "ダミー" : "本物", privacy: .public)）")
         // BluetoothService は、ここで1回だけ作る（作るたびに Bluetooth の通知が登録されるため）
         let deviceStore = DeviceStore(bluetooth: BluetoothServiceFactory.make())
-        // SleepHandler は DeviceStore を使うので、プロパティの初期値ではなく init の中で作る
+        let appSettings = AppSettings()
+        // SleepHandler は DeviceStore と AppSettings を使うので、プロパティの初期値ではなく init の中で作る
         _deviceStore = State(initialValue: deviceStore)
-        _sleepHandler = State(initialValue: SleepHandler(power: NSWorkspacePowerEventService(), deviceStore: deviceStore))
+        _appSettings = State(initialValue: appSettings)
+        _sleepHandler = State(initialValue: SleepHandler(
+            power: NSWorkspacePowerEventService(),
+            deviceStore: deviceStore,
+            settings: appSettings
+        ))
     }
 
     var body: some Scene {
@@ -25,6 +32,7 @@ struct BatonApp: App {
             MenuContentView()
                 .environment(loginItemStore)
                 .environment(deviceStore)
+                .environment(appSettings)
                 .environment(sleepHandler)
         }
         // .window：メニューを普通のメニューではなく、小さなウィンドウ（ポップオーバー）として表示する。

@@ -14,14 +14,14 @@ struct SleepHandlerTests {
     let bluetooth = MockBluetoothService(connectionDelay: .zero, disconnectionDelay: .zero)
     let power = MockPowerEventService()
     let deviceStore: DeviceStore
+    let settings: AppSettings
     let sleepHandler: SleepHandler
 
     init() {
-        deviceStore = DeviceStore(
-            bluetooth: bluetooth,
-            defaults: UserDefaults(suiteName: "SleepHandlerTests-\(UUID().uuidString)")!
-        )
-        sleepHandler = SleepHandler(power: power, deviceStore: deviceStore)
+        let defaults = UserDefaults(suiteName: "SleepHandlerTests-\(UUID().uuidString)")!
+        deviceStore = DeviceStore(bluetooth: bluetooth, defaults: defaults)
+        settings = AppSettings(defaults: defaults)  // 初期値：ロック・スリープはオン、画面の消灯はオフ
+        sleepHandler = SleepHandler(power: power, deviceStore: deviceStore, settings: settings)
     }
 
     private func register(_ addresses: BluetoothAddress...) throws {
@@ -36,7 +36,7 @@ struct SleepHandlerTests {
     @Test("離れるとき、接続中の登録機器を切断して記録する")
     func disconnectsConnectedRegisteredDevices() async throws {
         try register(headphones)
-        await sleepHandler.handleUserLeaving()
+        await sleepHandler.handleUserLeaving(reason: .sleep)
 
         #expect(!deviceStore.isConnected(headphones))
         #expect(sleepHandler.devicesToReconnect == [headphones])
@@ -44,7 +44,7 @@ struct SleepHandlerTests {
 
     @Test("登録していない機器は、接続中でも切断しない")
     func keepsUnregisteredDevices() async {
-        await sleepHandler.handleUserLeaving()  // ヘッドホンは接続中だが、登録していない
+        await sleepHandler.handleUserLeaving(reason: .sleep)  // ヘッドホンは接続中だが、登録していない
 
         #expect(deviceStore.isConnected(headphones))
         #expect(sleepHandler.devicesToReconnect.isEmpty)
@@ -53,7 +53,7 @@ struct SleepHandlerTests {
     @Test("未接続の登録機器は、記録しない")
     func ignoresDisconnectedRegisteredDevices() async throws {
         try register(earphones)
-        await sleepHandler.handleUserLeaving()
+        await sleepHandler.handleUserLeaving(reason: .sleep)
 
         #expect(sleepHandler.devicesToReconnect.isEmpty)
     }
@@ -61,12 +61,58 @@ struct SleepHandlerTests {
     @Test("ロックとスリープが続けて起きても（2回離れても）、記録は残り、戻ってきたら再接続する")
     func leavingTwice() async throws {
         try register(headphones)
-        await sleepHandler.handleUserLeaving()  // ロック
-        await sleepHandler.handleUserLeaving()  // 続けてスリープ
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+        await sleepHandler.handleUserLeaving(reason: .sleep)  // 続けてスリープ
 
         #expect(sleepHandler.devicesToReconnect == [headphones])
         await sleepHandler.handleUserReturned()
         #expect(deviceStore.isConnected(headphones))
+    }
+
+    // MARK: - 切断のきっかけの設定
+
+    @Test("初期値では、画面が消えただけでは切断しない")
+    func keepsConnectionOnDisplaySleepByDefault() async throws {
+        try register(headphones)
+        await sleepHandler.handleUserLeaving(reason: .displaySleep)
+
+        #expect(deviceStore.isConnected(headphones))
+        #expect(sleepHandler.devicesToReconnect.isEmpty)
+    }
+
+    @Test("設定をオンにすると、画面が消えたときに切断する")
+    func disconnectsOnDisplaySleepWhenEnabled() async throws {
+        try register(headphones)
+        settings.disconnectsOnDisplaySleep = true
+        await sleepHandler.handleUserLeaving(reason: .displaySleep)
+
+        #expect(!deviceStore.isConnected(headphones))
+        #expect(sleepHandler.devicesToReconnect == [headphones])
+    }
+
+    @Test("ロックの設定がオフなら、ロックでは切断せず、続けてスリープしたときに切断する")
+    func disconnectsOnlyOnSleepWhenLockIsOff() async throws {
+        try register(headphones)
+        settings.disconnectsOnScreenLock = false
+
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+        #expect(deviceStore.isConnected(headphones))
+        #expect(sleepHandler.devicesToReconnect.isEmpty)
+
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+        #expect(!deviceStore.isConnected(headphones))
+        #expect(sleepHandler.devicesToReconnect == [headphones])
+    }
+
+    @Test("設定がオフで切断しなかったときは、戻ってきても何もしない（記録がないため）")
+    func doesNothingOnReturnWhenNotDisconnected() async throws {
+        try register(headphones)
+        settings.disconnectsOnSleep = false
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+        bluetooth.simulateExternalDisconnection(headphones)  // スリープ中に、ヘッドホンの電源を切った
+        await sleepHandler.handleUserReturned()
+
+        #expect(!deviceStore.isConnected(headphones))
     }
 
     // MARK: - ユーザーが戻ってきたとき
@@ -74,7 +120,7 @@ struct SleepHandlerTests {
     @Test("戻ってきたら、スリープ前に接続していた機器を再接続し、記録を消す")
     func reconnectsOnReturn() async throws {
         try register(headphones)
-        await sleepHandler.handleUserLeaving()
+        await sleepHandler.handleUserLeaving(reason: .sleep)
         await sleepHandler.handleUserReturned()
 
         #expect(deviceStore.isConnected(headphones))
@@ -92,7 +138,7 @@ struct SleepHandlerTests {
     @Test("スリープ中にヘッドホンの側からつないできた機器は、そのまま（エラーにしない）")
     func skipsAlreadyConnectedDevices() async throws {
         try register(headphones)
-        await sleepHandler.handleUserLeaving()
+        await sleepHandler.handleUserLeaving(reason: .sleep)
         bluetooth.simulateExternalConnection(headphones)  // スリープ中に、ヘッドホンの電源を入れてつながった
         await sleepHandler.handleUserReturned()
 
@@ -104,7 +150,7 @@ struct SleepHandlerTests {
     func givesUpSilentlyOnFailure() async throws {
         try register(speaker)
         bluetooth.simulateExternalConnection(speaker)  // 接続中にしてからスリープする
-        await sleepHandler.handleUserLeaving()
+        await sleepHandler.handleUserLeaving(reason: .sleep)
         #expect(sleepHandler.devicesToReconnect == [speaker])
 
         await sleepHandler.handleUserReturned()  // 再接続は失敗する
@@ -119,7 +165,7 @@ struct SleepHandlerTests {
     func respondsToPowerEvents() async throws {
         try register(headphones)
 
-        power.simulateUserLeaving()
+        power.simulateUserLeaving(.sleep)
         try await waitUntil { !deviceStore.isConnected(headphones) }
 
         power.simulateUserReturned()
