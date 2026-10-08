@@ -126,9 +126,9 @@ struct MenuContentView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("離れるときに切断")
                 .font(.callout)
-            Toggle("画面をロックしたとき", isOn: $settings.disconnectsOnScreenLock)
-            Toggle("スリープに入るとき", isOn: $settings.disconnectsOnSleep)
-            Toggle("画面が消えたとき", isOn: $settings.disconnectsOnDisplaySleep)
+            settingSwitch("画面をロックしたとき", isOn: $settings.disconnectsOnScreenLock)
+            settingSwitch("スリープに入るとき", isOn: $settings.disconnectsOnSleep)
+            settingSwitch("画面が消えたとき", isOn: $settings.disconnectsOnDisplaySleep)
             Text("戻ってきたら、切断した機器を再接続します")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -140,6 +140,16 @@ struct MenuContentView: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+
+    /// 名前を左端、スイッチを右端に置いたスイッチ。
+    /// macOS の標準ではスイッチが名前のすぐ右に付き、名前の長さで位置がずれるので、
+    /// 名前を横いっぱいに広げて、スイッチを右端（機器の「接続」「切断」ボタンと同じ列）にそろえる
+    private func settingSwitch(_ title: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            Text(title)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
         .toggleStyle(.switch)
         .controlSize(.small)
     }
@@ -147,11 +157,10 @@ struct MenuContentView: View {
     /// 「ログイン時に起動」のオン・オフと、その補足の表示
     @ViewBuilder
     private var loginItemSection: some View {
-        Toggle("ログイン時に起動", isOn: Binding(
+        settingSwitch("ログイン時に起動", isOn: Binding(
             get: { loginItemStore.isEnabled },
             set: { loginItemStore.setEnabled($0) }
         ))
-        .toggleStyle(.switch)
 
         if loginItemStore.requiresApproval {
             VStack(alignment: .leading, spacing: 4) {
