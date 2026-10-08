@@ -8,6 +8,8 @@ struct MenuContentView: View {
     @Environment(LoginItemStore.self) private var loginItemStore
     /// BatonApp で作って渡している、登録機器と接続状態
     @Environment(DeviceStore.self) private var deviceStore
+    /// BatonApp で作って渡している、アプリの設定
+    @Environment(AppSettings.self) private var appSettings
     /// BatonApp で作って渡している、スリープ時の切断と復帰時の再接続
     @Environment(SleepHandler.self) private var sleepHandler
     /// ウィンドウ（登録画面）を開くための機能
@@ -38,6 +40,10 @@ struct MenuContentView: View {
             if BluetoothServiceFactory.usesMock {
                 mockSleepSection
             }
+
+            Divider()
+
+            leaveSettingsSection
 
             Divider()
 
@@ -90,24 +96,71 @@ struct MenuContentView: View {
     /// ダミーのモードでだけ表示する、離れる・戻るを再現するボタン（実際にスリープやロックをせずに動きを確かめるため）
     private var mockSleepSection: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Button("離れる（スリープ・ロック）を再現") {
-                Task { await sleepHandler.handleUserLeaving() }
-            }
-            Button("戻るを再現") {
-                Task { await sleepHandler.handleUserReturned() }
+            Text("再現")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Button("ロック") {
+                    Task { await sleepHandler.handleUserLeaving(reason: .screenLock) }
+                }
+                Button("スリープ") {
+                    Task { await sleepHandler.handleUserLeaving(reason: .sleep) }
+                }
+                Button("画面の消灯") {
+                    Task { await sleepHandler.handleUserLeaving(reason: .displaySleep) }
+                }
+                Button("戻る") {
+                    Task { await sleepHandler.handleUserReturned() }
+                }
             }
         }
+        .controlSize(.small)
+    }
+
+    /// 離れるときに、どのきっかけで切断するかのスイッチ。戻ってきたときは、切断した機器を必ず再接続する
+    @ViewBuilder
+    private var leaveSettingsSection: some View {
+        // @Environment で受け取った値から、スイッチに渡す Binding（$settings.〜）を作るために @Bindable にする
+        @Bindable var settings = appSettings
+
+        VStack(alignment: .leading, spacing: 6) {
+            Text("離れるときに切断")
+                .font(.callout)
+            settingSwitch("画面をロックしたとき", isOn: $settings.disconnectsOnScreenLock)
+            settingSwitch("スリープに入るとき", isOn: $settings.disconnectsOnSleep)
+            settingSwitch("画面が消えたとき", isOn: $settings.disconnectsOnDisplaySleep)
+            Text("戻ってきたら、切断した機器を再接続します")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            if !settings.disconnectsOnScreenLock {
+                // ヘッドホンがつながっている間は Mac が自動でスリープしないことがあり（仕様書 7）、
+                // 電源ボタンで離れても切断されなくなるため
+                Text("ヘッドホンがつながっている間は、Mac が自動でスリープしないことがあります")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// 名前を左端、スイッチを右端に置いたスイッチ。
+    /// macOS の標準ではスイッチが名前のすぐ右に付き、名前の長さで位置がずれるので、
+    /// 名前を横いっぱいに広げて、スイッチを右端（機器の「接続」「切断」ボタンと同じ列）にそろえる
+    private func settingSwitch(_ title: String, isOn: Binding<Bool>) -> some View {
+        Toggle(isOn: isOn) {
+            Text(title)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .toggleStyle(.switch)
         .controlSize(.small)
     }
 
     /// 「ログイン時に起動」のオン・オフと、その補足の表示
     @ViewBuilder
     private var loginItemSection: some View {
-        Toggle("ログイン時に起動", isOn: Binding(
+        settingSwitch("ログイン時に起動", isOn: Binding(
             get: { loginItemStore.isEnabled },
             set: { loginItemStore.setEnabled($0) }
         ))
-        .toggleStyle(.switch)
 
         if loginItemStore.requiresApproval {
             VStack(alignment: .leading, spacing: 4) {
@@ -131,8 +184,10 @@ struct MenuContentView: View {
 
 #Preview {
     let deviceStore = DeviceStore(bluetooth: MockBluetoothService())
+    let appSettings = AppSettings()
     return MenuContentView()
         .environment(LoginItemStore())
         .environment(deviceStore)
-        .environment(SleepHandler(power: MockPowerEventService(), deviceStore: deviceStore))
+        .environment(appSettings)
+        .environment(SleepHandler(power: MockPowerEventService(), deviceStore: deviceStore, settings: appSettings))
 }
