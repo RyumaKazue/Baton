@@ -29,9 +29,17 @@ final class IOBluetoothService: NSObject, BluetoothService {
     /// 接続中だと分かっている音声機器。通知の重なりを見分けるために使う
     private var connectedAddresses: Set<BluetoothAddress> = []
     /// 接続の完了を待っている処理（機器ごと）
-    private var pendingConnections: [BluetoothAddress: CheckedContinuation<Void, Error>] = [:]
+    private var pendingConnections: [BluetoothAddress: PendingOperation] = [:]
     /// 切断の完了を待っている処理（機器ごと）
-    private var pendingDisconnections: [BluetoothAddress: CheckedContinuation<Void, Error>] = [:]
+    private var pendingDisconnections: [BluetoothAddress: PendingOperation] = [:]
+
+    /// 完了を待っている接続・切断の処理。
+    /// 時間切れのタイマーも一緒に持ち、処理が終わったら取り消す。取り消さないと、残ったタイマーが
+    /// 同じ機器の次の操作を時間切れにしてしまう（docs/spikes/sleep-reconnect.md 8.4）
+    private struct PendingOperation {
+        let continuation: CheckedContinuation<Void, Error>
+        var timeout: Task<Void, Never>?
+    }
 
     override init() {
         super.init()
@@ -78,7 +86,7 @@ final class IOBluetoothService: NSObject, BluetoothService {
 
         // 「終わったら呼んでもらう」方式の API を、async で待てる形に包む
         try await withCheckedThrowingContinuation { continuation in
-            pendingConnections[address] = continuation
+            pendingConnections[address] = PendingOperation(continuation: continuation)
 
             // ターゲット（self）を渡すと、すぐに処理が戻り、接続が終わったときに connectionComplete(_:status:) が呼ばれる
             let result = device.openConnection(self)
@@ -86,10 +94,18 @@ final class IOBluetoothService: NSObject, BluetoothService {
                 finishConnection(address, with: .failure(BluetoothError.connectionFailed(code: result)))
                 return
             }
+            // すでに終わっていれば、タイマーは要らない
+            guard pendingConnections[address] != nil else {
+                return
+            }
 
-            // 万一、完了が呼ばれなかったときのための時間切れ
-            Task { [weak self] in
-                try? await Task.sleep(for: Self.connectionTimeout)
+            // 万一、完了が呼ばれなかったときのための時間切れ。完了したら finishConnection で取り消す
+            pendingConnections[address]?.timeout = Task { [weak self] in
+                do {
+                    try await Task.sleep(for: Self.connectionTimeout)
+                } catch {
+                    return  // 取り消された（時間内に完了した）
+                }
                 self?.finishConnection(address, with: .failure(BluetoothError.timedOut))
             }
         }
@@ -108,7 +124,7 @@ final class IOBluetoothService: NSObject, BluetoothService {
         Logger.bluetooth.notice("切断を開始：\(address, privacy: .public)")
 
         try await withCheckedThrowingContinuation { continuation in
-            pendingDisconnections[address] = continuation
+            pendingDisconnections[address] = PendingOperation(continuation: continuation)
 
             // closeConnection() はすぐに「成功」を返すが、実際の切断は少し後（検証 4.2）。
             // 完了は deviceDisconnected(_:fromDevice:) で受け取る
@@ -117,9 +133,18 @@ final class IOBluetoothService: NSObject, BluetoothService {
                 finishDisconnection(address, with: .failure(BluetoothError.disconnectionFailed(code: result)))
                 return
             }
+            // すでに終わっていれば、タイマーは要らない
+            guard pendingDisconnections[address] != nil else {
+                return
+            }
 
-            Task { [weak self] in
-                try? await Task.sleep(for: Self.disconnectionTimeout)
+            // 切断の通知が来なかったときのための時間切れ。通知が来たら finishDisconnection で取り消す
+            pendingDisconnections[address]?.timeout = Task { [weak self] in
+                do {
+                    try await Task.sleep(for: Self.disconnectionTimeout)
+                } catch {
+                    return  // 取り消された（時間内に切断の通知が来た）
+                }
                 guard let self else { return }
                 // 通知が届かなくても、実際に切れていれば成功とする
                 let stillConnected = self.device(for: address)?.isConnected() ?? false
@@ -183,20 +208,22 @@ final class IOBluetoothService: NSObject, BluetoothService {
 
     /// 待っている接続の処理を終わらせる。すでに終わっていれば何もしない（完了と時間切れの、先に来た方だけが効く）
     private func finishConnection(_ address: BluetoothAddress, with result: Result<Void, Error>) {
-        guard let continuation = pendingConnections.removeValue(forKey: address) else {
+        guard let pending = pendingConnections.removeValue(forKey: address) else {
             return
         }
+        pending.timeout?.cancel()
         Self.log("接続", address: address, result: result)
-        continuation.resume(with: result)
+        pending.continuation.resume(with: result)
     }
 
-    /// 待っている切断の処理を終わらせる。すでに終わっていれば何もしない
+    /// 待っている切断の処理を終わらせる。すでに終わっていれば何もしない（通知と時間切れの、先に来た方だけが効く）
     private func finishDisconnection(_ address: BluetoothAddress, with result: Result<Void, Error>) {
-        guard let continuation = pendingDisconnections.removeValue(forKey: address) else {
+        guard let pending = pendingDisconnections.removeValue(forKey: address) else {
             return
         }
+        pending.timeout?.cancel()
         Self.log("切断", address: address, result: result)
-        continuation.resume(with: result)
+        pending.continuation.resume(with: result)
     }
 
     /// 接続・切断の結果をログに出す
