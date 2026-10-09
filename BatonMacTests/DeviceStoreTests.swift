@@ -4,7 +4,8 @@ import Testing
 @testable import Baton
 
 /// DeviceStore のテスト。
-/// Bluetooth は偽物（MockBluetoothService）に、保存先はテスト専用の UserDefaults に差し替える。
+/// Bluetooth は偽物（MockBluetoothService）に、出力先も偽物（MockAudioOutputService）に、
+/// 保存先はテスト専用の UserDefaults に差し替える。
 @MainActor
 struct DeviceStoreTests {
     /// ダミーの機器のアドレス（MockBluetoothService が持っているもの）
@@ -13,11 +14,17 @@ struct DeviceStoreTests {
     let speaker = BluetoothAddress("00:00:00:00:00:03")!     // 接続すると必ず失敗する
 
     let bluetooth = MockBluetoothService(connectionDelay: .zero, disconnectionDelay: .zero)
+    let audioOutput = MockAudioOutputService()
     /// テストごとに別の保存先を使い、本物の設定やほかのテストに影響しないようにする
     let defaults = UserDefaults(suiteName: "DeviceStoreTests-\(UUID().uuidString)")!
 
-    private func makeStore() -> DeviceStore {
-        DeviceStore(bluetooth: bluetooth, defaults: defaults)
+    private func makeStore(audioOutput: MockAudioOutputService? = nil) -> DeviceStore {
+        DeviceStore(
+            bluetooth: bluetooth,
+            audioOutput: audioOutput ?? self.audioOutput,
+            defaults: defaults,
+            audioOutputRetryInterval: .zero
+        )
     }
 
     private func pairedDevice(_ address: BluetoothAddress) throws -> BluetoothDeviceInfo {
@@ -176,7 +183,7 @@ struct DeviceStoreTests {
     func operationInProgress() async {
         // 接続に時間がかかる偽物を使い、途中の状態を確かめる
         let slowBluetooth = MockBluetoothService(connectionDelay: .milliseconds(200), disconnectionDelay: .zero)
-        let store = DeviceStore(bluetooth: slowBluetooth, defaults: defaults)
+        let store = DeviceStore(bluetooth: slowBluetooth, audioOutput: MockAudioOutputService(), defaults: defaults)
 
         let task = Task { await store.connect(earphones) }
         try? await Task.sleep(for: .milliseconds(50))
@@ -185,5 +192,53 @@ struct DeviceStoreTests {
         await task.value
         #expect(store.operation(for: earphones) == nil)
         #expect(store.isConnected(earphones))
+    }
+
+    // MARK: - 出力先の切り替え
+
+    @Test("接続すると、音の出力先をその機器に切り替える")
+    func switchesAudioOutputOnConnect() async {
+        let store = makeStore()
+        await store.connect(earphones)
+
+        #expect(audioOutput.defaultOutput == earphones)
+    }
+
+    @Test("出力先の一覧に遅れて現れても、待ってから切り替える")
+    func waitsForAudioOutputToAppear() async {
+        let lateOutput = MockAudioOutputService(appearsOnAttempt: 3)
+        let store = makeStore(audioOutput: lateOutput)
+        await store.connect(earphones)
+
+        #expect(lateOutput.defaultOutput == earphones)
+        #expect(lateOutput.attempts == 3)
+    }
+
+    @Test("出力先の一覧に現れなければ、決めた回数であきらめる（接続はできたまま、メッセージは出さない）")
+    func givesUpWhenAudioOutputNeverAppears() async {
+        let missingOutput = MockAudioOutputService(appearsOnAttempt: 0)
+        let store = makeStore(audioOutput: missingOutput)
+        await store.connect(earphones)
+
+        #expect(missingOutput.defaultOutput == nil)
+        #expect(missingOutput.attempts == DeviceStore.maxAudioOutputAttempts)
+        #expect(store.isConnected(earphones))
+        #expect(store.errorMessage(for: earphones) == nil)
+    }
+
+    @Test("接続に失敗したら、出力先は切り替えない")
+    func doesNotSwitchAudioOutputWhenConnectFails() async {
+        let store = makeStore()
+        await store.connect(speaker)  // 必ず失敗する
+
+        #expect(audioOutput.attempts == 0)
+    }
+
+    @Test("ヘッドホンの側からつないできたとき（Baton の接続でないとき）は、出力先は切り替えない")
+    func doesNotSwitchAudioOutputOnExternalConnection() {
+        _ = makeStore()
+        bluetooth.simulateExternalConnection(earphones)
+
+        #expect(audioOutput.attempts == 0)
     }
 }

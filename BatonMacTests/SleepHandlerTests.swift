@@ -19,7 +19,12 @@ struct SleepHandlerTests {
 
     init() {
         let defaults = UserDefaults(suiteName: "SleepHandlerTests-\(UUID().uuidString)")!
-        deviceStore = DeviceStore(bluetooth: bluetooth, defaults: defaults)
+        deviceStore = DeviceStore(
+            bluetooth: bluetooth,
+            audioOutput: MockAudioOutputService(),
+            defaults: defaults,
+            audioOutputRetryInterval: .zero
+        )
         settings = AppSettings(defaults: defaults)  // 初期値：ロック・スリープはオン、画面の消灯はオフ
         sleepHandler = SleepHandler(power: power, deviceStore: deviceStore, settings: settings)
     }

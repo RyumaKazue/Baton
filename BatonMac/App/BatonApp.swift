@@ -15,7 +15,10 @@ struct BatonApp: App {
     init() {
         Logger.app.notice("起動（Bluetooth：\(BluetoothServiceFactory.usesMock ? "ダミー" : "本物", privacy: .public)）")
         // BluetoothService は、ここで1回だけ作る（作るたびに Bluetooth の通知が登録されるため）
-        let deviceStore = DeviceStore(bluetooth: BluetoothServiceFactory.make())
+        let deviceStore = DeviceStore(
+            bluetooth: BluetoothServiceFactory.make(),
+            audioOutput: AudioOutputServiceFactory.make()
+        )
         let appSettings = AppSettings()
         // SleepHandler は DeviceStore と AppSettings を使うので、プロパティの初期値ではなく init の中で作る
         _deviceStore = State(initialValue: deviceStore)
