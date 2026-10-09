@@ -13,6 +13,7 @@ struct SleepHandlerTests {
 
     let bluetooth = MockBluetoothService(connectionDelay: .zero, disconnectionDelay: .zero)
     let power = MockPowerEventService()
+    let audioOutput = MockAudioOutputService()
     let deviceStore: DeviceStore
     let settings: AppSettings
     let sleepHandler: SleepHandler
@@ -21,12 +22,19 @@ struct SleepHandlerTests {
         let defaults = UserDefaults(suiteName: "SleepHandlerTests-\(UUID().uuidString)")!
         deviceStore = DeviceStore(
             bluetooth: bluetooth,
-            audioOutput: MockAudioOutputService(),
+            audioOutput: audioOutput,
             defaults: defaults,
             audioOutputRetryInterval: .zero
         )
-        settings = AppSettings(defaults: defaults)  // 初期値：ロック・スリープはオン、画面の消灯はオフ
-        sleepHandler = SleepHandler(power: power, deviceStore: deviceStore, settings: settings)
+        settings = AppSettings(defaults: defaults)  // 初期値：ロック・スリープはオン、画面の消灯はオフ、再生中は切断しない
+        // 音が出ていないのが3回続いたら切断する（本物は2秒ごとに15回。テストでは待たずに済むようにする）
+        sleepHandler = SleepHandler(
+            power: power,
+            deviceStore: deviceStore,
+            settings: settings,
+            silenceCheckInterval: .zero,
+            silentChecksBeforeLeaving: 3
+        )
     }
 
     private func register(_ addresses: BluetoothAddress...) throws {
@@ -216,6 +224,111 @@ struct SleepHandlerTests {
         await sleepHandler.handleUserLeaving(reason: .sleep)  // また離れる（ここで切断される）
         bluetooth.simulateExternalConnection(earphones)
         try await waitUntil { !deviceStore.isConnected(earphones) }
+    }
+
+    // MARK: - 再生中は切断しない
+
+    @Test("再生中にロックしたら切断せず、音が止まるのを待つ")
+    func keepsConnectionWhenLockedWhilePlaying() async throws {
+        try register(headphones)
+        audioOutput.playingDevices = [headphones]
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+        try await settle()
+
+        #expect(deviceStore.isConnected(headphones))
+        #expect(sleepHandler.presence == .waitingForSilence)
+        #expect(sleepHandler.devicesToReconnect.isEmpty)
+    }
+
+    @Test("再生していないときにロックしたら、今までどおり切断する")
+    func disconnectsWhenLockedWithoutPlaying() async throws {
+        try register(headphones)
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+
+        #expect(!deviceStore.isConnected(headphones))
+        #expect(sleepHandler.isAway)
+    }
+
+    @Test("再生中に画面が消えても（設定がオンのとき）、切断しない")
+    func keepsConnectionOnDisplaySleepWhilePlaying() async throws {
+        try register(headphones)
+        settings.disconnectsOnDisplaySleep = true
+        audioOutput.playingDevices = [headphones]
+        await sleepHandler.handleUserLeaving(reason: .displaySleep)
+
+        #expect(deviceStore.isConnected(headphones))
+        #expect(sleepHandler.presence == .waitingForSilence)
+    }
+
+    @Test("再生中でも、スリープでは切断する")
+    func disconnectsOnSleepWhilePlaying() async throws {
+        try register(headphones)
+        audioOutput.playingDevices = [headphones]
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+
+        #expect(!deviceStore.isConnected(headphones))
+        #expect(sleepHandler.isAway)
+    }
+
+    @Test("待っている間に音が止まったら、決めた回数の後に切断し、戻ってきたら再接続する")
+    func disconnectsAfterAudioStops() async throws {
+        try register(headphones)
+        audioOutput.playingDevices = [headphones]
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+
+        audioOutput.playingDevices = []  // 一時停止した
+        try await waitUntil { sleepHandler.isAway }
+        try await waitUntil { !deviceStore.isConnected(headphones) }
+        #expect(sleepHandler.devicesToReconnect == [headphones])
+
+        await sleepHandler.handleUserReturned()
+        #expect(deviceStore.isConnected(headphones))
+    }
+
+    @Test("待っている間に再生を再開したら、数え直す")
+    func restartsCountingWhenPlaybackResumes() async throws {
+        try register(headphones)
+        // ロックのときは再生中 → 止まる、止まる → 再開 → 止まる、止まる、止まる（ここで3回続く）
+        audioOutput.scriptedPlaying = [true, false, false, true, false, false, false]
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+
+        try await waitUntil { sleepHandler.isAway }
+        #expect(audioOutput.isPlayingCalls == 7)  // 再開がなければ、4回目で切断していた
+    }
+
+    @Test("待っている間にロックを解除したら、何もしない（切断も再接続もしない）")
+    func returnsWhileWaitingForSilence() async throws {
+        try register(headphones)
+        audioOutput.playingDevices = [headphones]
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+        await sleepHandler.handleUserReturned()
+
+        audioOutput.playingDevices = []  // 戻った後に止めても、見張りは終わっているので切断しない
+        try await settle()
+        #expect(sleepHandler.presence == .present)
+        #expect(deviceStore.isConnected(headphones))
+    }
+
+    @Test("待っている間にスリープしたら、切断する")
+    func disconnectsOnSleepWhileWaitingForSilence() async throws {
+        try register(headphones)
+        audioOutput.playingDevices = [headphones]
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+        await sleepHandler.handleUserLeaving(reason: .sleep)
+
+        #expect(!deviceStore.isConnected(headphones))
+        #expect(sleepHandler.isAway)
+    }
+
+    @Test("「再生中は切断しない」がオフなら、再生中でもロックで切断する")
+    func disconnectsWhilePlayingWhenSettingIsOff() async throws {
+        try register(headphones)
+        settings.keepsConnectionWhilePlaying = false
+        audioOutput.playingDevices = [headphones]
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+
+        #expect(!deviceStore.isConnected(headphones))
+        #expect(sleepHandler.isAway)
     }
 
     // MARK: - ユーザーが戻ってきたとき

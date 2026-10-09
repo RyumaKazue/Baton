@@ -10,6 +10,14 @@ final class MockAudioOutputService: AudioOutputService {
     /// 切り替えを頼まれた回数
     private(set) var attempts = 0
 
+    /// 音が出ている機器。テストで、再生と停止を再現するために書き換える
+    var playingDevices: Set<BluetoothAddress> = []
+    /// 再生中かを聞かれるたびに、先頭から順に返す答え（テストで、再生と停止が続けて変わる場面を再現する）。
+    /// 使い切ったら playingDevices で答える
+    var scriptedPlaying: [Bool] = []
+    /// 再生中かを聞かれた回数
+    private(set) var isPlayingCalls = 0
+
     /// 何回目に頼まれたときに、出力先の一覧に現れるか（1なら、すぐに現れる）。0なら、いつまでも現れない
     private let appearsOnAttempt: Int
 
@@ -27,5 +35,13 @@ final class MockAudioOutputService: AudioOutputService {
         }
         defaultOutput = address
         return .switched
+    }
+
+    func isPlaying(on address: BluetoothAddress) -> Bool {
+        isPlayingCalls += 1
+        if !scriptedPlaying.isEmpty {
+            return scriptedPlaying.removeFirst()
+        }
+        return playingDevices.contains(address)
     }
 }
