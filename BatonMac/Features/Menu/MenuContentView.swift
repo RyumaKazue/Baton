@@ -183,7 +183,7 @@ struct MenuContentView: View {
 }
 
 #Preview {
-    let deviceStore = DeviceStore(bluetooth: MockBluetoothService())
+    let deviceStore = DeviceStore(bluetooth: MockBluetoothService(), audioOutput: MockAudioOutputService())
     let appSettings = AppSettings()
     return MenuContentView()
         .environment(LoginItemStore())

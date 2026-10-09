@@ -110,5 +110,5 @@ struct DeviceRegistrationView: View {
 
 #Preview {
     DeviceRegistrationView()
-        .environment(DeviceStore(bluetooth: MockBluetoothService()))
+        .environment(DeviceStore(bluetooth: MockBluetoothService(), audioOutput: MockAudioOutputService()))
 }

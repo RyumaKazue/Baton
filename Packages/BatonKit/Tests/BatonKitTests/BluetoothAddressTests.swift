@@ -46,6 +46,27 @@ struct BluetoothAddressTests {
         #expect(BluetoothAddress(string) == nil)
     }
 
+    // MARK: - CoreAudio の UID から作る
+
+    @Test("Bluetooth の出力先・入力の UID から、アドレスを取り出す", arguments: [
+        "08-F0-B6-F4-7F-FB:output",
+        "08-F0-B6-F4-7F-FB:input",
+        "08-F0-B6-F4-7F-FB",
+    ])
+    func parsesAudioDeviceUID(_ uid: String) {
+        #expect(BluetoothAddress(audioDeviceUID: uid)?.rawValue == "08:F0:B6:F4:7F:FB")
+    }
+
+    @Test("Bluetooth 以外の UID からは作れない", arguments: [
+        "BuiltInSpeakerDevice",       // 内蔵スピーカー
+        "BuiltInMicrophoneDevice",    // 内蔵マイク
+        "08-F0-B6-F4-7F-FBX:output",  // アドレスの後ろに余計な文字
+        "08-F0-B6-F4-7F",             // 短い
+    ])
+    func rejectsNonBluetoothUID(_ uid: String) {
+        #expect(BluetoothAddress(audioDeviceUID: uid) == nil)
+    }
+
     // MARK: - 保存（Codable）
 
     @Test("1つの文字列として JSON に保存し、元に戻せる")
