@@ -26,6 +26,12 @@ final class DeviceStore {
     @ObservationIgnored private let bluetooth: any BluetoothService
     @ObservationIgnored private let defaults: UserDefaults
 
+    /// 機器がこの Mac につながったときに呼ばれる（Baton の操作でも、外で起きた接続でも）。
+    /// DeviceStore は、誰が受け取って何をするかを知らない。今は SleepHandler が受け取り、
+    /// 離れている間なら切断する（DeviceStore から SleepHandler への依存を作らないため、処理を渡してもらう形にしている）
+    /// メインスレッドで呼ぶので、受け取る側はその場で自分の状態を見て判断できる
+    @ObservationIgnored var onDeviceConnected: (@MainActor (BluetoothAddress) -> Void)?
+
     /// UserDefaults に保存するときのキー
     static let storageKey = "registeredDevices"
 
@@ -161,6 +167,7 @@ final class DeviceStore {
         switch event {
         case .connected(let address):
             connectedAddresses.insert(address)
+            onDeviceConnected?(address)
         case .disconnected(let address):
             connectedAddresses.remove(address)
         }
