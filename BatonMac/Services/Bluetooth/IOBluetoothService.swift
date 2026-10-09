@@ -241,7 +241,7 @@ final class IOBluetoothService: NSObject, BluetoothService {
     }
 
     private static func address(of device: IOBluetoothDevice) -> BluetoothAddress? {
-        device.addressString.flatMap(BluetoothAddress.init)
+        device.addressString.flatMap { BluetoothAddress($0) }
     }
 
     private static func isAudioDevice(_ device: IOBluetoothDevice) -> Bool {

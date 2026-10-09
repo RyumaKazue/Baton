@@ -8,6 +8,7 @@ import os
 /// - 登録機器は UserDefaults に保存し、アプリを再起動しても残す（仕様書 13.3）
 /// - 接続状態は保存しない（変わるものなので、BluetoothService から取得し、変化の通知で更新する）
 /// - Bluetooth の操作は BluetoothService 越しに行うので、テストでは偽物（MockBluetoothService）に差し替えられる
+/// - Baton が接続したら、音の出力先をその機器に切り替える（AudioOutputService 越し。偽物に差し替えられる）
 @MainActor
 @Observable
 final class DeviceStore {
@@ -24,7 +25,13 @@ final class DeviceStore {
 
     // 画面に知らせる必要のないものは、@ObservationIgnored で変化を追いかけないようにする
     @ObservationIgnored private let bluetooth: any BluetoothService
+    @ObservationIgnored private let audioOutput: any AudioOutputService
     @ObservationIgnored private let defaults: UserDefaults
+    /// 出力先の一覧に現れるのを待つ間隔
+    @ObservationIgnored private let audioOutputRetryInterval: Duration
+
+    /// 出力先の一覧に現れるのを待つ回数（間隔0.5秒なら、最大で約5秒待つ）
+    static let maxAudioOutputAttempts = 10
 
     /// 機器がこの Mac につながったときに呼ばれる（Baton の操作でも、外で起きた接続でも）。
     /// DeviceStore は、誰が受け取って何をするかを知らない。今は SleepHandler が受け取り、
@@ -37,10 +44,19 @@ final class DeviceStore {
 
     /// - Parameters:
     ///   - bluetooth: 使う Bluetooth のサービス（本物か偽物）
+    ///   - audioOutput: 使う出力先のサービス（本物か偽物）
     ///   - defaults: 保存先。テストでは、テスト専用の UserDefaults を渡す
-    init(bluetooth: any BluetoothService, defaults: UserDefaults = .standard) {
+    ///   - audioOutputRetryInterval: 出力先の一覧に現れるのを待つ間隔。テストでは 0 にする
+    init(
+        bluetooth: any BluetoothService,
+        audioOutput: any AudioOutputService,
+        defaults: UserDefaults = .standard,
+        audioOutputRetryInterval: Duration = .milliseconds(500)
+    ) {
         self.bluetooth = bluetooth
+        self.audioOutput = audioOutput
         self.defaults = defaults
+        self.audioOutputRetryInterval = audioOutputRetryInterval
         registeredDevices = Self.loadRegisteredDevices(from: defaults)
         refreshPairedDevices()
 
@@ -100,13 +116,17 @@ final class DeviceStore {
         Logger.devices.notice("登録を解除：\(address, privacy: .public)")
     }
 
-    /// この Mac に接続する。接続が終わるまで待つ（最大で10秒ほどかかる）
+    /// この Mac に接続する。接続が終わるまで待つ（最大で10秒ほどかかる）。
+    /// 接続できたら、音の出力先をその機器に切り替える
     /// - Parameter reportsErrors: false なら、失敗してもエラーメッセージを残さない（復帰時の自動の再接続など）
     func connect(_ address: BluetoothAddress, reportsErrors: Bool = true) async {
-        await perform(.connecting, on: address, reportsErrors: reportsErrors) {
+        let connected = await perform(.connecting, on: address, reportsErrors: reportsErrors) {
             try await bluetooth.connect(address)
             // 変化の通知でも更新されるが、通知より先に画面に反映するため、ここでも更新する
             connectedAddresses.insert(address)
+        }
+        if connected {
+            await switchAudioOutput(to: address)
         }
     }
 
@@ -121,14 +141,16 @@ final class DeviceStore {
     // MARK: - 補助
 
     /// 接続・切断の共通の流れ：操作中にする → 実行する → 失敗したらメッセージを残す → 操作中を解除する
+    /// - Returns: 実行して成功したら true（失敗したとき、同じ機器の操作が終わっていなくて何もしなかったときは false）
+    @discardableResult
     private func perform(
         _ operation: DeviceOperation,
         on address: BluetoothAddress,
         reportsErrors: Bool = true,
         action: () async throws -> Void
-    ) async {
+    ) async -> Bool {
         guard operations[address] == nil else {
-            return  // 同じ機器の操作が終わっていなければ、何もしない
+            return false  // 同じ機器の操作が終わっていなければ、何もしない
         }
         operations[address] = operation
         errorMessages[address] = nil
@@ -136,10 +158,42 @@ final class DeviceStore {
 
         do {
             try await action()
+            return true
         } catch {
             Logger.devices.error("\(operation == .connecting ? "接続" : "切断", privacy: .public)できなかった：\(self.name(of: address), privacy: .public)、\(String(describing: error), privacy: .public)\(reportsErrors ? "" : "（メッセージは出さない）", privacy: .public)")
-            guard reportsErrors else { return }
-            errorMessages[address] = Self.message(for: error, operation: operation, deviceName: name(of: address))
+            if reportsErrors {
+                errorMessages[address] = Self.message(for: error, operation: operation, deviceName: name(of: address))
+            }
+            return false
+        }
+    }
+
+    /// 音の出力先を、接続した機器に切り替える。接続する前の出力先がモニターなどだと、
+    /// 接続しても出力先が切り替わらないため（docs/spikes/iobluetooth.md 4.2）。
+    /// 接続の直後は、出力先の一覧にまだ現れていないことがあるので、少しずつ待ってやり直す。
+    /// 切り替えられなくても、接続はできているので、エラーメッセージは出さずにログだけ残す
+    private func switchAudioOutput(to address: BluetoothAddress) async {
+        let start = ContinuousClock.now
+        for attempt in 1...Self.maxAudioOutputAttempts {
+            let result = audioOutput.switchDefaultOutput(to: address)
+            let elapsed = ContinuousClock.now - start
+            switch result {
+            case .switched:
+                Logger.devices.notice("出力先を切り替えた：\(self.name(of: address), privacy: .public)（\(attempt, privacy: .public)回目、\(elapsed, privacy: .public)）")
+                return
+            case .alreadyDefault:
+                Logger.devices.notice("出力先はすでに \(self.name(of: address), privacy: .public)（\(attempt, privacy: .public)回目、\(elapsed, privacy: .public)）")
+                return
+            case .failed(let status):
+                Logger.devices.error("出力先を切り替えられなかった：\(self.name(of: address), privacy: .public)、status=\(status, privacy: .public)")
+                return
+            case .notFound:
+                guard attempt < Self.maxAudioOutputAttempts else {
+                    Logger.devices.error("出力先の一覧に現れなかったので、切り替えない：\(self.name(of: address), privacy: .public)（\(elapsed, privacy: .public)）")
+                    return
+                }
+                try? await Task.sleep(for: audioOutputRetryInterval)
+            }
         }
     }
 
