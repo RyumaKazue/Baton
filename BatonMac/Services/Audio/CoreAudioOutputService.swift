@@ -12,7 +12,7 @@ import CoreAudio
 @MainActor
 final class CoreAudioOutputService: AudioOutputService {
     func switchDefaultOutput(to address: BluetoothAddress) -> AudioOutputSwitchResult {
-        guard let deviceID = Self.outputDeviceIDs().first(where: { Self.bluetoothAddress(of: $0) == address }) else {
+        guard let deviceID = Self.outputDeviceID(for: address) else {
             return .notFound
         }
         if Self.defaultOutputDeviceID() == deviceID {
@@ -31,7 +31,24 @@ final class CoreAudioOutputService: AudioOutputService {
         return status == noErr ? .switched : .failed(status: status)
     }
 
+    func isPlaying(on address: BluetoothAddress) -> Bool {
+        guard let deviceID = Self.outputDeviceID(for: address) else {
+            return false  // 出力先の一覧にない ＝ 音は出ていない
+        }
+        // どれかのアプリがその機器で音を出し入れしていると、0 以外になる
+        var propertyAddress = Self.systemProperty(kAudioDevicePropertyDeviceIsRunningSomewhere)
+        var isRunning: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(deviceID, &propertyAddress, 0, nil, &size, &isRunning)
+        return status == noErr && isRunning != 0
+    }
+
     // MARK: - CoreAudio への問い合わせ
+
+    /// その Bluetooth 機器の、出力の AudioDeviceID。出力先の一覧になければ nil
+    private static func outputDeviceID(for address: BluetoothAddress) -> AudioDeviceID? {
+        outputDeviceIDs().first { bluetoothAddress(of: $0) == address }
+    }
 
     /// 今の出力先
     private static func defaultOutputDeviceID() -> AudioDeviceID? {

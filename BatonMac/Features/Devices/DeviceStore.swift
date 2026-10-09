@@ -76,6 +76,11 @@ final class DeviceStore {
         connectedAddresses.contains(address)
     }
 
+    /// その機器から、今、音が出ているか（AudioOutputService に聞く）
+    func isPlaying(_ address: BluetoothAddress) -> Bool {
+        audioOutput.isPlaying(on: address)
+    }
+
     /// 接続・切断の途中なら、その操作を返す
     func operation(for address: BluetoothAddress) -> DeviceOperation? {
         operations[address]

@@ -10,6 +10,10 @@ protocol AudioOutputService: AnyObject {
     /// その Bluetooth 機器を、音の出力先にする。
     /// 接続の直後で、出力先の一覧にまだ現れていなければ `.notFound` を返す（呼ぶ側が少し待ってやり直す）
     func switchDefaultOutput(to address: BluetoothAddress) -> AudioOutputSwitchResult
+
+    /// その Bluetooth 機器から、今、音が出ているか（どれかのアプリが、その機器に音を送っているか）。
+    /// Chrome は一時停止すると、数秒のうちに「出ていない」に変わった（2026-10-09 の検証。#49）
+    func isPlaying(on address: BluetoothAddress) -> Bool
 }
 
 /// 出力先を切り替えた結果
