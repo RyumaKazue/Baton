@@ -8,7 +8,7 @@ import os
 /// - ユーザーが離れるとき（画面をロックしたとき、スリープに入る直前、画面が消えたとき）：
 ///   その理由で切断する設定（AppSettings）なら、「離れている間」にして、この Mac に接続中の登録機器を切断し、
 ///   「離れる前に接続していた機器」として記録する。設定がオフなら何もしない
-/// - ただし、ロックと画面の消灯のときにヘッドホンから音が出ていれば（「再生中は切断しない」がオンのとき）、
+/// - ただし、ロックと画面の消灯のときにヘッドホンから音が出ていれば（「再生中は、音が止まってから切断する」がオンのとき）、
 ///   切断せずに「音が止まるのを待っている」にする。音が止まって一定時間たったら、そこで切断する。
 ///   スリープでは、再生中でも切断する（Mac が寝ると音は止まるため）
 /// - 離れている間に登録機器がつないできたとき（ヘッドホンの電源を入れ直した など）：
@@ -96,7 +96,7 @@ final class SleepHandler {
             return
         }
         // 再生中なら、ロックと画面の消灯では切断しない（スリープでは切断する。Mac が寝ると音は止まるため）
-        if reason != .sleep, settings.keepsConnectionWhilePlaying, presence != .away {
+        if reason != .sleep, settings.waitsForAudioToStop, presence != .away {
             let playing = connectedRegisteredDevices().filter { deviceStore.isPlaying($0) }
             if !playing.isEmpty {
                 Logger.sleep.notice("離れる（\(reason, privacy: .public)）：\(playing.map(\.rawValue).joined(separator: "、"), privacy: .public) から音が出ているので切断せず、止まるのを待つ")

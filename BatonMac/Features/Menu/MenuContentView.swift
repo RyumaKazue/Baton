@@ -129,9 +129,9 @@ struct MenuContentView: View {
             settingSwitch("画面をロックしたとき", isOn: $settings.disconnectsOnScreenLock)
             settingSwitch("スリープに入るとき", isOn: $settings.disconnectsOnSleep)
             settingSwitch("画面が消えたとき", isOn: $settings.disconnectsOnDisplaySleep)
-            settingSwitch("音声の再生中は切断しない", isOn: $settings.keepsConnectionWhilePlaying)
-            if settings.keepsConnectionWhilePlaying {
-                Text("ロック・画面の消灯のとき。音が止まって30秒たったら切断します")
+            settingSwitch("再生中は、音が止まってから切断する", isOn: $settings.waitsForAudioToStop)
+            if settings.waitsForAudioToStop {
+                Text("ロック・画面の消灯のとき。止まって30秒たったら切断します")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

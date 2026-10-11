@@ -26,7 +26,7 @@ struct SleepHandlerTests {
             defaults: defaults,
             audioOutputRetryInterval: .zero
         )
-        settings = AppSettings(defaults: defaults)  // 初期値：ロック・スリープはオン、画面の消灯はオフ、再生中は切断しない
+        settings = AppSettings(defaults: defaults)  // 初期値：ロック・スリープはオン、画面の消灯はオフ、再生中は音が止まってから切断する
         // 音が出ていないのが3回続いたら切断する（本物は2秒ごとに15回。テストでは待たずに済むようにする）
         sleepHandler = SleepHandler(
             power: power,
@@ -226,7 +226,7 @@ struct SleepHandlerTests {
         try await waitUntil { !deviceStore.isConnected(earphones) }
     }
 
-    // MARK: - 再生中は切断しない
+    // MARK: - 再生中は、音が止まってから切断する
 
     @Test("再生中にロックしたら切断せず、音が止まるのを待つ")
     func keepsConnectionWhenLockedWhilePlaying() async throws {
@@ -320,10 +320,10 @@ struct SleepHandlerTests {
         #expect(sleepHandler.isAway)
     }
 
-    @Test("「再生中は切断しない」がオフなら、再生中でもロックで切断する")
+    @Test("「再生中は、音が止まってから切断する」がオフなら、再生中でもロックですぐ切断する")
     func disconnectsWhilePlayingWhenSettingIsOff() async throws {
         try register(headphones)
-        settings.keepsConnectionWhilePlaying = false
+        settings.waitsForAudioToStop = false
         audioOutput.playingDevices = [headphones]
         await sleepHandler.handleUserLeaving(reason: .screenLock)
 
