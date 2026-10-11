@@ -3,7 +3,7 @@ import Observation
 
 /// アプリの設定。Mac 全体で1つ持ち、UserDefaults に保存して、アプリを再起動しても残す（仕様書 13.3）。
 ///
-/// - 今は「離れるときに、どのきっかけで切断するか」と「再生中は切断しないか」を持つ。v0.2 の設定（表示名、応答の待ち時間、
+/// - 今は「離れるときに、どのきっかけで切断するか」と「再生中は、音が止まってから切断するか」を持つ。v0.2 の設定（表示名、応答の待ち時間、
 ///   切断時の通知）も、ここに足していく
 /// - ログイン時の起動は、ここではなく LoginItemStore が持つ（値が UserDefaults ではなく macOS の側にあるため）
 /// - 画面（メニューのスイッチ）が値を読み書きし、SleepHandler が切断するかの判断に使う
@@ -25,9 +25,11 @@ final class AppSettings {
     var disconnectsOnDisplaySleep: Bool {
         didSet { defaults.set(disconnectsOnDisplaySleep, forKey: Key.disconnectsOnDisplaySleep) }
     }
-    /// 音声の再生中は、ロックと画面の消灯では切断しない（音が止まったら切断する）。スリープでは切断する
-    var keepsConnectionWhilePlaying: Bool {
-        didSet { defaults.set(keepsConnectionWhilePlaying, forKey: Key.keepsConnectionWhilePlaying) }
+    /// 再生中は、音が止まってから切断する（ロックと画面の消灯のとき。音が止まって約30秒たったら切断する）。
+    /// オフなら、再生中でもすぐ切断する。スリープでは、どちらでもすぐ切断する。
+    /// 「離れるときに切断」の他のスイッチとそろえて、オン＝切断する側の言い方にしている（オン＝切断しない、だと逆になって分かりにくいため）
+    var waitsForAudioToStop: Bool {
+        didSet { defaults.set(waitsForAudioToStop, forKey: Key.waitsForAudioToStop) }
     }
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -37,7 +39,7 @@ final class AppSettings {
         static let disconnectsOnScreenLock = "disconnectsOnScreenLock"
         static let disconnectsOnSleep = "disconnectsOnSleep"
         static let disconnectsOnDisplaySleep = "disconnectsOnDisplaySleep"
-        static let keepsConnectionWhilePlaying = "keepsConnectionWhilePlaying"
+        static let waitsForAudioToStop = "waitsForAudioToStop"
     }
 
     /// 一度も切り替えていないときの値。
@@ -46,7 +48,7 @@ final class AppSettings {
         Key.disconnectsOnScreenLock: true,
         Key.disconnectsOnSleep: true,
         Key.disconnectsOnDisplaySleep: false,
-        Key.keepsConnectionWhilePlaying: true,
+        Key.waitsForAudioToStop: true,
     ]
 
     /// - Parameter defaults: 保存先。テストでは、テスト専用の UserDefaults を渡す
@@ -60,7 +62,7 @@ final class AppSettings {
         disconnectsOnScreenLock = defaults.bool(forKey: Key.disconnectsOnScreenLock)
         disconnectsOnSleep = defaults.bool(forKey: Key.disconnectsOnSleep)
         disconnectsOnDisplaySleep = defaults.bool(forKey: Key.disconnectsOnDisplaySleep)
-        keepsConnectionWhilePlaying = defaults.bool(forKey: Key.keepsConnectionWhilePlaying)
+        waitsForAudioToStop = defaults.bool(forKey: Key.waitsForAudioToStop)
     }
 
     /// その理由で離れたときに、切断するか
