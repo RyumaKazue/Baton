@@ -194,6 +194,28 @@ struct DeviceStoreTests {
         #expect(store.isConnected(earphones))
     }
 
+    // MARK: - エラーメッセージを消す
+
+    @Test("メッセージをすべて消せる（メニューを閉じたとき）")
+    func clearsErrorMessages() async {
+        let store = makeStore()
+        await store.connect(speaker)  // 必ず失敗する
+        #expect(store.errorMessage(for: speaker) != nil)
+
+        store.clearErrorMessages()
+        #expect(store.errorMessage(for: speaker) == nil)
+    }
+
+    @Test("その機器が外でつながったら、前の失敗のメッセージは消える")
+    func clearsErrorMessageWhenDeviceConnects() async {
+        let store = makeStore()
+        await store.connect(speaker)  // 必ず失敗する
+        #expect(store.errorMessage(for: speaker) != nil)
+
+        bluetooth.simulateExternalConnection(speaker)  // ヘッドホンの電源を入れ直して、つながった
+        #expect(store.errorMessage(for: speaker) == nil)
+    }
+
     // MARK: - 出力先の切り替え
 
     @Test("接続すると、音の出力先をその機器に切り替える")

@@ -12,14 +12,14 @@ struct AppSettingsTests {
         defaults = UserDefaults(suiteName: suiteName)!
     }
 
-    @Test("一度も切り替えていなければ、ロック・スリープはオン、画面の消灯はオフ、再生中は切断しない")
+    @Test("一度も切り替えていなければ、ロック・スリープはオン、画面の消灯はオフ、再生中は音が止まってから切断する")
     func initialValues() {
         let settings = AppSettings(defaults: defaults)
 
         #expect(settings.disconnects(on: .screenLock))
         #expect(settings.disconnects(on: .sleep))
         #expect(!settings.disconnects(on: .displaySleep))
-        #expect(settings.keepsConnectionWhilePlaying)
+        #expect(settings.waitsForAudioToStop)
     }
 
     @Test("初期値は保存しない（ユーザーが切り替えたものだけを保存する）")
@@ -36,12 +36,12 @@ struct AppSettingsTests {
         let settings = AppSettings(defaults: defaults)
         settings.disconnectsOnScreenLock = false
         settings.disconnectsOnDisplaySleep = true
-        settings.keepsConnectionWhilePlaying = false
+        settings.waitsForAudioToStop = false
 
         let reloaded = AppSettings(defaults: UserDefaults(suiteName: suiteName)!)
         #expect(!reloaded.disconnects(on: .screenLock))
         #expect(reloaded.disconnects(on: .sleep))
         #expect(reloaded.disconnects(on: .displaySleep))
-        #expect(!reloaded.keepsConnectionWhilePlaying)
+        #expect(!reloaded.waitsForAudioToStop)
     }
 }
