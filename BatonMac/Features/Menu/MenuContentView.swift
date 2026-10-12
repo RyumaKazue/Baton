@@ -63,6 +63,10 @@ struct MenuContentView: View {
             // システム設定で直接変えられていることもあるので、表示のたびに取り直す
             loginItemStore.refresh()
         }
+        .onDisappear {
+            // 接続・切断に失敗したときのメッセージは、メニューを閉じたら消す（一度見たら残さない）
+            deviceStore.clearErrorMessages()
+        }
     }
 
     /// アプリのバージョン（例：v0.1）。Info.plist の CFBundleShortVersionString（ビルド設定 MARKETING_VERSION）から読む
@@ -117,35 +121,47 @@ struct MenuContentView: View {
         .controlSize(.small)
     }
 
-    /// 離れるときに、どのきっかけで切断するかのスイッチ。戻ってきたときは、切断した機器を必ず再接続する
+    /// 自動で切断する設定。見出しと項目が結び付くように、「いつ切断するか（タイミング）」と
+    /// 「再生中のときにどうするか」を、見出しで分けて並べる
     @ViewBuilder
     private var leaveSettingsSection: some View {
         // @Environment で受け取った値から、スイッチに渡す Binding（$settings.〜）を作るために @Bindable にする
         @Bindable var settings = appSettings
 
         VStack(alignment: .leading, spacing: 6) {
-            Text("離れるときに切断")
-                .font(.callout)
+            sectionHeader("自動で切断するタイミング")
+            sectionNote("他の端末ですぐ使えるように切断し、戻ってきたらつなぎ直します")
             settingSwitch("画面をロックしたとき", isOn: $settings.disconnectsOnScreenLock)
-            settingSwitch("スリープに入るとき", isOn: $settings.disconnectsOnSleep)
+            settingSwitch("スリープしたとき", isOn: $settings.disconnectsOnSleep)
             settingSwitch("画面が消えたとき", isOn: $settings.disconnectsOnDisplaySleep)
-            settingSwitch("音声の再生中は切断しない", isOn: $settings.keepsConnectionWhilePlaying)
-            if settings.keepsConnectionWhilePlaying {
-                Text("ロック・画面の消灯のとき。音が止まって30秒たったら切断します")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Text("戻ってきたら、切断した機器を再接続します")
-                .font(.caption)
-                .foregroundStyle(.secondary)
             if !settings.disconnectsOnScreenLock {
                 // ヘッドホンがつながっている間は Mac が自動でスリープしないことがあり（仕様書 7）、
                 // 電源ボタンで離れても切断されなくなるため
-                Text("ヘッドホンがつながっている間は、Mac が自動でスリープしないことがあります")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                sectionNote("ヘッドホンがつながっている間は、Mac が自動でスリープしないことがあります")
             }
         }
+
+        VStack(alignment: .leading, spacing: 6) {
+            sectionHeader("再生中のとき")
+            settingSwitch("音が止まるまで待つ", isOn: $settings.waitsForAudioToStop)
+            if settings.waitsForAudioToStop {
+                sectionNote("ロック・画面の消灯のとき、止まって30秒たってから切断します")
+            }
+        }
+    }
+
+    /// 設定のまとまりの見出し（項目と区別できるように太字にする）
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.callout.weight(.semibold))
+    }
+
+    /// 設定のまとまりの補足の文（小さく、薄い字）。長い文は折り返す
+    private func sectionNote(_ text: String) -> some View {
+        Text(text)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     /// 名前を左端、スイッチを右端に置いたスイッチ。

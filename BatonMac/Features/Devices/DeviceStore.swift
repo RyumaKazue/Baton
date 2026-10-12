@@ -104,6 +104,11 @@ final class DeviceStore {
         connectedAddresses = Set(pairedDevices.filter(\.isConnected).map(\.address))
     }
 
+    /// 接続・切断に失敗したときのメッセージを、すべて消す（メニューを閉じたとき。一度見たメッセージを残し続けないため）
+    func clearErrorMessages() {
+        errorMessages.removeAll()
+    }
+
     /// 機器を登録する。すでに登録していれば何もしない
     func register(_ device: BluetoothDeviceInfo) {
         guard !isRegistered(device.address) else {
@@ -226,9 +231,12 @@ final class DeviceStore {
         switch event {
         case .connected(let address):
             connectedAddresses.insert(address)
+            // つながった・切れたら、前の失敗のメッセージは古くなるので消す
+            errorMessages[address] = nil
             onDeviceConnected?(address)
         case .disconnected(let address):
             connectedAddresses.remove(address)
+            errorMessages[address] = nil
         }
     }
 
