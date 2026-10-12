@@ -62,6 +62,8 @@ struct MenuContentView: View {
         .onAppear {
             // システム設定で直接変えられていることもあるので、表示のたびに取り直す
             loginItemStore.refresh()
+            // Bluetooth の通知が届いていないことがあるので（#51）、開くたびに接続状態を読み直す
+            deviceStore.resync()
         }
         .onDisappear {
             // 接続・切断に失敗したときのメッセージは、メニューを閉じたら消す（一度見たら残さない）
