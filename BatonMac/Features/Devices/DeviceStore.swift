@@ -76,6 +76,12 @@ final class DeviceStore {
         connectedAddresses.contains(address)
     }
 
+    /// 接続状態を Bluetooth に直接聞き直す。通知がときどき届かなくなるので（#51）、
+    /// メニューを開いたとき、戻ってきたときに呼ぶ。ずれていた分は、通知と同じ流れ（handle）で反映される
+    func resync() {
+        bluetooth.resync()
+    }
+
     /// その機器から、今、音が出ているか（AudioOutputService に聞く）
     func isPlaying(_ address: BluetoothAddress) -> Bool {
         audioOutput.isPlaying(on: address)

@@ -194,6 +194,28 @@ struct DeviceStoreTests {
         #expect(store.isConnected(earphones))
     }
 
+    // MARK: - 読み直し（通知が届かなかったとき。#51）
+
+    @Test("通知が届かずにつながっていた機器は、読み直すと接続中になる")
+    func resyncFindsMissedConnection() {
+        let store = makeStore()
+        bluetooth.simulateMissedConnection(earphones)
+        #expect(!store.isConnected(earphones))
+
+        store.resync()
+        #expect(store.isConnected(earphones))
+    }
+
+    @Test("通知が届かずに切れていた機器は、読み直すと未接続になる")
+    func resyncFindsMissedDisconnection() {
+        let store = makeStore()
+        bluetooth.simulateMissedDisconnection(headphones)
+        #expect(store.isConnected(headphones))
+
+        store.resync()
+        #expect(!store.isConnected(headphones))
+    }
+
     // MARK: - エラーメッセージを消す
 
     @Test("メッセージをすべて消せる（メニューを閉じたとき）")

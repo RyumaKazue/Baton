@@ -331,6 +331,29 @@ struct SleepHandlerTests {
         #expect(sleepHandler.isAway)
     }
 
+    // MARK: - 読み直し（通知が届かなかったとき。#51）
+
+    @Test("離れるときに読み直して、通知が届かずにつながっていた機器も切断する")
+    func resyncsBeforeLeaving() async throws {
+        try register(earphones)
+        bluetooth.simulateMissedConnection(earphones)  // つながったが、通知が届かなかった
+        await sleepHandler.handleUserLeaving(reason: .screenLock)
+
+        #expect(!deviceStore.isConnected(earphones))
+        #expect(sleepHandler.devicesToReconnect == [earphones])
+    }
+
+    @Test("戻ってきたときに読み直して、通知が届かずにつながっていた機器は、接続し直さない")
+    func resyncsOnReturn() async throws {
+        try register(headphones)
+        await sleepHandler.handleUserLeaving(reason: .sleep)  // 切断して記録
+        bluetooth.simulateMissedConnection(headphones)        // 戻る前に、通知なしでつながった
+        await sleepHandler.handleUserReturned()
+
+        #expect(deviceStore.isConnected(headphones))
+        #expect(deviceStore.errorMessage(for: headphones) == nil)
+    }
+
     // MARK: - ユーザーが戻ってきたとき
 
     @Test("戻ってきたら、スリープ前に接続していた機器を再接続し、記録を消す")
