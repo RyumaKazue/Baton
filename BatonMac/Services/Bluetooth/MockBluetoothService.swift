@@ -22,6 +22,8 @@ final class MockBluetoothService: BluetoothService {
     private var devices: [MockDevice]
     /// 操作中の機器（同じ機器に続けて操作したときの再現）
     private var busyAddresses: Set<BluetoothAddress> = []
+    /// onEvent で「つながった」と伝えた機器（通知が届かなかった場面を、resync() で見つけるために使う）
+    private var reportedConnected: Set<BluetoothAddress> = []
 
     /// 接続にかかる時間（本物では 2〜9秒ほどかかった）
     private let connectionDelay: Duration
@@ -36,6 +38,7 @@ final class MockBluetoothService: BluetoothService {
             MockDevice(address: BluetoothAddress("00:00:00:00:00:02")!, name: "ダミー イヤホン", isConnected: false, failsToConnect: false),
             MockDevice(address: BluetoothAddress("00:00:00:00:00:03")!, name: "ダミー スピーカー（接続に失敗する）", isConnected: false, failsToConnect: true),
         ]
+        reportedConnected = Set(devices.filter(\.isConnected).map(\.address))
     }
 
     // MARK: - BluetoothService
@@ -101,6 +104,25 @@ final class MockBluetoothService: BluetoothService {
         setConnected(true, at: index)
     }
 
+    /// 通知が届かないまま、外でつながったことを再現する（#51）
+    func simulateMissedConnection(_ address: BluetoothAddress) {
+        guard let index = devices.firstIndex(where: { $0.address == address }) else { return }
+        devices[index].isConnected = true
+    }
+
+    /// 通知が届かないまま、外で切れたことを再現する（#51）
+    func simulateMissedDisconnection(_ address: BluetoothAddress) {
+        guard let index = devices.firstIndex(where: { $0.address == address }) else { return }
+        devices[index].isConnected = false
+    }
+
+    /// 本物と同じく、伝えていなかった変化を onEvent で伝える
+    func resync() {
+        for device in devices where device.isConnected != reportedConnected.contains(device.address) {
+            report(device.isConnected, address: device.address)
+        }
+    }
+
     // MARK: - 補助
 
     /// 接続状態を変えて、変化を onEvent で伝える（本物の通知の代わり）
@@ -108,6 +130,16 @@ final class MockBluetoothService: BluetoothService {
         devices[index].isConnected = connected
         let address = devices[index].address
         Logger.bluetooth.notice("（ダミー）\(connected ? "接続" : "切断", privacy: .public)：\(self.devices[index].name, privacy: .public)")
+        report(connected, address: address)
+    }
+
+    /// 変化を onEvent で伝え、伝えたことを覚えておく
+    private func report(_ connected: Bool, address: BluetoothAddress) {
+        if connected {
+            reportedConnected.insert(address)
+        } else {
+            reportedConnected.remove(address)
+        }
         onEvent?(connected ? .connected(address) : .disconnected(address))
     }
 }

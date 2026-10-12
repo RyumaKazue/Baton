@@ -10,6 +10,8 @@ import os
 /// - 接続は、終わったら呼んでもらう方式（openConnection(_:)）にして、待っている間も画面を固まらせない
 /// - 切断の完了は、isConnected() の直後の値ではなく、切断の通知で判断する
 /// - 同じ通知が重なって届いても、変化は1回だけ onEvent に伝える
+/// - 通知と完了の連絡は、ときどき届かなくなる（#51。原因は不明）。そのため、接続・切断の完了は
+///   0.5秒ごとに isConnected() でも確かめ、resync() で接続状態を読み直して通知の登録もやり直せるようにしている
 ///
 /// IOBluetooth は Objective-C の「ターゲットとセレクタ」の仕組みで結果を知らせてくるので、NSObject を継承している。
 /// アプリが動いている間ずっと1つだけ使う前提なので、通知の登録は解除していない。
@@ -21,6 +23,8 @@ final class IOBluetoothService: NSObject, BluetoothService {
     private static let connectionTimeout: Duration = .seconds(20)
     /// 切断の通知を待つ最大の時間（検証では約1秒で届いた）
     private static let disconnectionTimeout: Duration = .seconds(5)
+    /// 接続・切断が終わったかを isConnected() で確かめる間隔（完了の連絡が届かないときのため）
+    private static let completionCheckInterval: Duration = .milliseconds(500)
 
     /// 接続の通知の登録の控え
     private var connectNotification: IOBluetoothUserNotification?
@@ -43,7 +47,13 @@ final class IOBluetoothService: NSObject, BluetoothService {
 
     override init() {
         super.init()
-        // 登録した時点ですでに接続中の機器についても、すぐに通知が届く（検証 4.5）
+        registerConnectNotification()
+    }
+
+    /// 接続の通知を登録する（登録し直すときは、前の登録を解除してから）。
+    /// 登録した時点ですでに接続中の機器についても、すぐに通知が届く（検証 4.5）
+    private func registerConnectNotification() {
+        connectNotification?.unregister()
         connectNotification = IOBluetoothDevice.register(
             forConnectNotifications: self,
             selector: #selector(deviceConnected(_:fromDevice:))
@@ -99,12 +109,22 @@ final class IOBluetoothService: NSObject, BluetoothService {
                 return
             }
 
-            // 万一、完了が呼ばれなかったときのための時間切れ。完了したら finishConnection で取り消す
+            // 完了の連絡が届かないことがあるので（#51）、0.5秒ごとに、つながったかを直接確かめる。
+            // 決めた時間までにつながらなければ、時間切れにする。完了したら finishConnection で取り消す
             pendingConnections[address]?.timeout = Task { [weak self] in
-                do {
-                    try await Task.sleep(for: Self.connectionTimeout)
-                } catch {
-                    return  // 取り消された（時間内に完了した）
+                let deadline = ContinuousClock.now + Self.connectionTimeout
+                while ContinuousClock.now < deadline {
+                    do {
+                        try await Task.sleep(for: Self.completionCheckInterval)
+                    } catch {
+                        return  // 取り消された（完了の連絡が来た）
+                    }
+                    guard let self else { return }
+                    if let device = self.device(for: address), device.isConnected() {
+                        self.noteConnected(device, address: address, source: "つながったことを確認")
+                        self.finishConnection(address, with: .success(()))
+                        return
+                    }
                 }
                 self?.finishConnection(address, with: .failure(BluetoothError.timedOut))
             }
@@ -138,17 +158,25 @@ final class IOBluetoothService: NSObject, BluetoothService {
                 return
             }
 
-            // 切断の通知が来なかったときのための時間切れ。通知が来たら finishDisconnection で取り消す
+            // 切断の通知が届かないことがあるので（#51）、0.5秒ごとに、切れたかを直接確かめる。
+            // 決めた時間までに切れなければ、時間切れにする。通知が来たら finishDisconnection で取り消す
             pendingDisconnections[address]?.timeout = Task { [weak self] in
-                do {
-                    try await Task.sleep(for: Self.disconnectionTimeout)
-                } catch {
-                    return  // 取り消された（時間内に切断の通知が来た）
+                let deadline = ContinuousClock.now + Self.disconnectionTimeout
+                while ContinuousClock.now < deadline {
+                    do {
+                        try await Task.sleep(for: Self.completionCheckInterval)
+                    } catch {
+                        return  // 取り消された（切断の通知が来た）
+                    }
+                    guard let self else { return }
+                    if self.device(for: address)?.isConnected() != true {
+                        self.disconnectNotifications.removeValue(forKey: address)?.unregister()
+                        self.noteDisconnected(address, name: nil, source: "切れたことを確認")
+                        self.finishDisconnection(address, with: .success(()))
+                        return
+                    }
                 }
-                guard let self else { return }
-                // 通知が届かなくても、実際に切れていれば成功とする
-                let stillConnected = self.device(for: address)?.isConnected() ?? false
-                self.finishDisconnection(address, with: stillConnected ? .failure(BluetoothError.timedOut) : .success(()))
+                self?.finishDisconnection(address, with: .failure(BluetoothError.timedOut))
             }
         }
     }
@@ -160,20 +188,7 @@ final class IOBluetoothService: NSObject, BluetoothService {
         guard Self.isAudioDevice(device), let address = Self.address(of: device) else {
             return
         }
-        // 切断の通知は機器ごとに登録する。二重に登録しないよう、前の登録は解除してから登録し直す
-        disconnectNotifications[address]?.unregister()
-        disconnectNotifications[address] = device.register(
-            forDisconnectNotification: self,
-            selector: #selector(deviceDisconnected(_:fromDevice:))
-        )
-
-        // すでに接続中だと分かっている機器なら、重なって届いた通知なので伝えない
-        guard connectedAddresses.insert(address).inserted else {
-            Logger.bluetooth.debug("接続の通知（重なりのため無視）：\(address, privacy: .public)")
-            return
-        }
-        Logger.bluetooth.notice("接続の通知：\(device.name ?? "?", privacy: .public)（\(address, privacy: .public)）")
-        onEvent?(.connected(address))
+        noteConnected(device, address: address, source: "接続の通知")
     }
 
     /// 機器が切断したとき
@@ -184,12 +199,66 @@ final class IOBluetoothService: NSObject, BluetoothService {
         notification.unregister()
         disconnectNotifications[address] = nil
         finishDisconnection(address, with: .success(()))
+        noteDisconnected(address, name: device.name, source: "切断の通知")
+    }
 
-        guard connectedAddresses.remove(address) != nil else {
-            Logger.bluetooth.debug("切断の通知（重なりのため無視）：\(address, privacy: .public)")
+    // MARK: - 読み直し
+
+    func resync() {
+        // 通知の登録をやり直す。登録し直すと、すでにつながっている機器の接続の通知も、少し後に届く
+        registerConnectNotification()
+
+        // 届いていなかった変化を、直接聞いて合わせる
+        let devices = (IOBluetoothDevice.pairedDevices() as? [IOBluetoothDevice] ?? []).filter(Self.isAudioDevice)
+        var actuallyConnected: [BluetoothAddress: IOBluetoothDevice] = [:]
+        for device in devices where device.isConnected() {
+            if let address = Self.address(of: device) {
+                actuallyConnected[address] = device
+            }
+        }
+        let missedConnections = Set(actuallyConnected.keys).subtracting(connectedAddresses)
+        let missedDisconnections = connectedAddresses.subtracting(actuallyConnected.keys)
+        guard !missedConnections.isEmpty || !missedDisconnections.isEmpty else {
+            Logger.bluetooth.debug("読み直し：ずれはなかった")
             return
         }
-        Logger.bluetooth.notice("切断の通知：\(device.name ?? "?", privacy: .public)（\(address, privacy: .public)）")
+        Logger.bluetooth.notice("読み直し：届いていなかった変化があった（つながっていた：\(missedConnections.map(\.rawValue).joined(separator: "、"), privacy: .public)、切れていた：\(missedDisconnections.map(\.rawValue).joined(separator: "、"), privacy: .public)）")
+        for address in missedDisconnections {
+            disconnectNotifications.removeValue(forKey: address)?.unregister()
+            noteDisconnected(address, name: nil, source: "読み直しで切れていた")
+        }
+        for (address, device) in actuallyConnected where missedConnections.contains(address) {
+            noteConnected(device, address: address, source: "読み直しでつながっていた")
+        }
+    }
+
+    // MARK: - 接続状態の記録
+
+    /// つながったことを記録し、新しい変化なら onEvent で伝える。
+    /// 切断の通知は機器ごとに登録する。二重に登録しないよう、前の登録は解除してから登録し直す
+    private func noteConnected(_ device: IOBluetoothDevice, address: BluetoothAddress, source: String) {
+        disconnectNotifications[address]?.unregister()
+        disconnectNotifications[address] = device.register(
+            forDisconnectNotification: self,
+            selector: #selector(deviceDisconnected(_:fromDevice:))
+        )
+
+        // すでに接続中だと分かっている機器なら、重なって届いた通知なので伝えない
+        guard connectedAddresses.insert(address).inserted else {
+            Logger.bluetooth.debug("\(source, privacy: .public)（重なりのため無視）：\(address, privacy: .public)")
+            return
+        }
+        Logger.bluetooth.notice("\(source, privacy: .public)：\(device.name ?? "?", privacy: .public)（\(address, privacy: .public)）")
+        onEvent?(.connected(address))
+    }
+
+    /// 切れたことを記録し、新しい変化なら onEvent で伝える
+    private func noteDisconnected(_ address: BluetoothAddress, name: String?, source: String) {
+        guard connectedAddresses.remove(address) != nil else {
+            Logger.bluetooth.debug("\(source, privacy: .public)（重なりのため無視）：\(address, privacy: .public)")
+            return
+        }
+        Logger.bluetooth.notice("\(source, privacy: .public)：\(name ?? "?", privacy: .public)（\(address, privacy: .public)）")
         onEvent?(.disconnected(address))
     }
 
