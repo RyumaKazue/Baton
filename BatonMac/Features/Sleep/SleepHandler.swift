@@ -95,6 +95,9 @@ final class SleepHandler {
             Logger.sleep.notice("離れる（\(reason, privacy: .public)）：設定がオフなので切断しない")
             return
         }
+        // Bluetooth の通知が届いていないことがあるので（#51）、接続状態を読み直してから、何を切断するかを決める。
+        // まだ「離れている間」ではないので、読み直しでつながっていた機器が見つかっても、ここでは切らない（この後の leave で切る）
+        deviceStore.resync()
         // 再生中なら、ロックと画面の消灯では切断しない（スリープでは切断する。Mac が寝ると音は止まるため）
         if reason != .sleep, settings.waitsForAudioToStop, presence != .away {
             let playing = connectedRegisteredDevices().filter { deviceStore.isPlaying($0) }
@@ -130,6 +133,8 @@ final class SleepHandler {
         // 再接続より先に戻す（再接続でつながったときに、切断してしまわないように）
         presence = .present
         limiter.reset()
+        // Bluetooth の通知が届いていないことがあるので（#51）、接続状態を読み直してから再接続を判断する
+        deviceStore.resync()
         let targets = devicesToReconnect
         // 先に記録を消す（画面の通知とシステムの通知が重なって2回呼ばれても、2回目は何もしないように）
         devicesToReconnect.removeAll()
