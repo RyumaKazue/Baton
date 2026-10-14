@@ -44,15 +44,15 @@ struct SettingsView: View {
         }
     }
 
-    /// 自動で切断する設定。見出しと項目が結び付くように、「いつ切断するか（タイミング）」と
-    /// 「再生中のときにどうするか」を、見出しで分けて並べる
+    /// 切断の設定。「いつ切断するか（タイミング）」を見出しの下に並べ、
+    /// その下に「再生中は接続を維持」を置く（2026-10-14 にユーザーが決めた文言）
     @ViewBuilder
     private var leaveSettingsSection: some View {
         // @Environment で受け取った値から、スイッチに渡す Binding（$settings.〜）を作るために @Bindable にする
         @Bindable var settings = appSettings
 
         VStack(alignment: .leading, spacing: 6) {
-            sectionHeader("自動で切断するタイミング")
+            sectionHeader("切断するタイミング")
             sectionNote("他の端末ですぐ使えるように切断し、戻ってきたらつなぎ直します")
             settingSwitch("画面をロックしたとき", isOn: $settings.disconnectsOnScreenLock)
             settingSwitch("スリープしたとき", isOn: $settings.disconnectsOnSleep)
@@ -65,10 +65,10 @@ struct SettingsView: View {
         }
 
         VStack(alignment: .leading, spacing: 6) {
-            sectionHeader("再生中のとき")
-            settingSwitch("音が止まるまで待つ", isOn: $settings.waitsForAudioToStop)
+            // オン＝音が止まるまで待ってから切断する（waitsForAudioToStop）。止まったら切断するので、ずっと維持するわけではない
+            settingSwitch("再生中は接続を維持", isOn: $settings.waitsForAudioToStop)
             if settings.waitsForAudioToStop {
-                sectionNote("ロック・画面の消灯のとき、止まって30秒たってから切断します")
+                sectionNote("ロック・画面の消灯のとき、音声が止まって30秒経ってから切断します。")
             }
         }
     }
