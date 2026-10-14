@@ -68,7 +68,7 @@ struct SettingsView: View {
             // オン＝音が止まるまで待ってから切断する（waitsForAudioToStop）。止まったら切断するので、ずっと維持するわけではない
             settingSwitch("再生中は接続を維持", isOn: $settings.waitsForAudioToStop)
             if settings.waitsForAudioToStop {
-                sectionNote("ロック・画面の消灯のとき、音声が止まって30秒経ってから切断します。")
+                sectionNote("ロック・画面の消灯の際に音声が出力されていた場合、切断せずに接続を維持します。\n音声が止まって30秒経ってから切断します。")
             }
         }
     }
