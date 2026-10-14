@@ -2,21 +2,80 @@ import BatonKit
 import SwiftUI
 
 /// メニューバーのアイコンをクリックしたときに表示する画面。
-/// 他の Mac での接続状態（フェーズ6）や切り替え（フェーズ7）は、この画面に追加していく。
+/// 機器の一覧（ふだんの画面）と、設定の画面（SettingsView）を、右上の歯車と「戻る」で切り替える（#55）。
 struct MenuContentView: View {
-    /// BatonApp で作って渡している、ログイン項目の状態
-    @Environment(LoginItemStore.self) private var loginItemStore
+    /// メニューの中に表示する画面
+    enum Page {
+        /// 機器の一覧と接続・切断（ふだんの画面）
+        case devices
+        /// 設定
+        case settings
+    }
+
     /// BatonApp で作って渡している、登録機器と接続状態
     @Environment(DeviceStore.self) private var deviceStore
-    /// BatonApp で作って渡している、アプリの設定
-    @Environment(AppSettings.self) private var appSettings
     /// BatonApp で作って渡している、スリープ時の切断と復帰時の再接続
     @Environment(SleepHandler.self) private var sleepHandler
     /// ウィンドウ（登録画面）を開くための機能
     @Environment(\.openWindow) private var openWindow
 
+    /// 今表示している画面
+    @State private var page: Page
+
+    /// - Parameter initialPage: 最初に表示する画面（ふだんは機器の一覧。プレビューやテストで設定の画面を見るときに変える）
+    init(initialPage: Page = .devices) {
+        _page = State(initialValue: initialPage)
+    }
+
     var body: some View {
+        Group {
+            switch page {
+            case .devices:
+                devicesPage
+            case .settings:
+                SettingsView(onBack: { page = .devices })
+            }
+        }
+        .padding()
+        .frame(width: 320, alignment: .leading)
+        .onAppear {
+            // Bluetooth の通知が届いていないことがあるので（#51）、開くたびに接続状態を読み直す
+            deviceStore.resync()
+        }
+        .onDisappear {
+            // 接続・切断に失敗したときのメッセージは、メニューを閉じたら消す（一度見たら残さない）
+            deviceStore.clearErrorMessages()
+            // 次に開いたときは、機器の一覧から始める
+            page = .devices
+        }
+    }
+
+    /// 機器の一覧の画面（ふだんの画面）
+    private var devicesPage: some View {
         VStack(alignment: .leading, spacing: 12) {
+            header
+
+            Divider()
+
+            registeredDevicesSection
+
+            if BluetoothServiceFactory.usesMock {
+                mockSleepSection
+            }
+
+            Divider()
+
+            Button("Baton を終了") {
+                // Dock にアイコンがないので、アプリを終了する手段はこのボタンだけになる
+                NSApplication.shared.terminate(nil)
+            }
+            .keyboardShortcut("q")
+        }
+    }
+
+    /// 左にアプリの名前とバージョン、右上に設定の歯車
+    private var header: some View {
+        HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Baton")
@@ -32,42 +91,15 @@ struct MenuContentView: View {
                         .foregroundStyle(.orange)
                 }
             }
-
-            Divider()
-
-            registeredDevicesSection
-
-            if BluetoothServiceFactory.usesMock {
-                mockSleepSection
+            Spacer()
+            Button {
+                page = .settings
+            } label: {
+                Image(systemName: "gearshape")
             }
-
-            Divider()
-
-            leaveSettingsSection
-
-            Divider()
-
-            loginItemSection
-
-            Divider()
-
-            Button("Baton を終了") {
-                // Dock にアイコンがないので、アプリを終了する手段はこのボタンだけになる
-                NSApplication.shared.terminate(nil)
-            }
-            .keyboardShortcut("q")
-        }
-        .padding()
-        .frame(width: 320, alignment: .leading)
-        .onAppear {
-            // システム設定で直接変えられていることもあるので、表示のたびに取り直す
-            loginItemStore.refresh()
-            // Bluetooth の通知が届いていないことがあるので（#51）、開くたびに接続状態を読み直す
-            deviceStore.resync()
-        }
-        .onDisappear {
-            // 接続・切断に失敗したときのメッセージは、メニューを閉じたら消す（一度見たら残さない）
-            deviceStore.clearErrorMessages()
+            .buttonStyle(.borderless)
+            .help("設定")
+            .accessibilityLabel("設定")
         }
     }
 
@@ -122,94 +154,22 @@ struct MenuContentView: View {
         }
         .controlSize(.small)
     }
-
-    /// 自動で切断する設定。見出しと項目が結び付くように、「いつ切断するか（タイミング）」と
-    /// 「再生中のときにどうするか」を、見出しで分けて並べる
-    @ViewBuilder
-    private var leaveSettingsSection: some View {
-        // @Environment で受け取った値から、スイッチに渡す Binding（$settings.〜）を作るために @Bindable にする
-        @Bindable var settings = appSettings
-
-        VStack(alignment: .leading, spacing: 6) {
-            sectionHeader("自動で切断するタイミング")
-            sectionNote("他の端末ですぐ使えるように切断し、戻ってきたらつなぎ直します")
-            settingSwitch("画面をロックしたとき", isOn: $settings.disconnectsOnScreenLock)
-            settingSwitch("スリープしたとき", isOn: $settings.disconnectsOnSleep)
-            settingSwitch("画面が消えたとき", isOn: $settings.disconnectsOnDisplaySleep)
-            if !settings.disconnectsOnScreenLock {
-                // ヘッドホンがつながっている間は Mac が自動でスリープしないことがあり（仕様書 7）、
-                // 電源ボタンで離れても切断されなくなるため
-                sectionNote("ヘッドホンがつながっている間は、Mac が自動でスリープしないことがあります")
-            }
-        }
-
-        VStack(alignment: .leading, spacing: 6) {
-            sectionHeader("再生中のとき")
-            settingSwitch("音が止まるまで待つ", isOn: $settings.waitsForAudioToStop)
-            if settings.waitsForAudioToStop {
-                sectionNote("ロック・画面の消灯のとき、止まって30秒たってから切断します")
-            }
-        }
-    }
-
-    /// 設定のまとまりの見出し（項目と区別できるように太字にする）
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.callout.weight(.semibold))
-    }
-
-    /// 設定のまとまりの補足の文（小さく、薄い字）。長い文は折り返す
-    private func sectionNote(_ text: String) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    /// 名前を左端、スイッチを右端に置いたスイッチ。
-    /// macOS の標準ではスイッチが名前のすぐ右に付き、名前の長さで位置がずれるので、
-    /// 名前を横いっぱいに広げて、スイッチを右端（機器の「接続」「切断」ボタンと同じ列）にそろえる
-    private func settingSwitch(_ title: String, isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) {
-            Text(title)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .toggleStyle(.switch)
-        .controlSize(.small)
-    }
-
-    /// 「ログイン時に起動」のオン・オフと、その補足の表示
-    @ViewBuilder
-    private var loginItemSection: some View {
-        settingSwitch("ログイン時に起動", isOn: Binding(
-            get: { loginItemStore.isEnabled },
-            set: { loginItemStore.setEnabled($0) }
-        ))
-
-        if loginItemStore.requiresApproval {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("システム設定で許可が必要です")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button("システム設定を開く") {
-                    loginItemStore.openSystemSettings()
-                }
-                .font(.caption)
-            }
-        }
-
-        if let message = loginItemStore.errorMessage {
-            Text(message)
-                .font(.caption)
-                .foregroundStyle(.red)
-        }
-    }
 }
 
-#Preview {
+#Preview("機器の一覧") {
     let deviceStore = DeviceStore(bluetooth: MockBluetoothService(), audioOutput: MockAudioOutputService())
     let appSettings = AppSettings()
     return MenuContentView()
+        .environment(LoginItemStore())
+        .environment(deviceStore)
+        .environment(appSettings)
+        .environment(SleepHandler(power: MockPowerEventService(), deviceStore: deviceStore, settings: appSettings))
+}
+
+#Preview("設定") {
+    let deviceStore = DeviceStore(bluetooth: MockBluetoothService(), audioOutput: MockAudioOutputService())
+    let appSettings = AppSettings()
+    return MenuContentView(initialPage: .settings)
         .environment(LoginItemStore())
         .environment(deviceStore)
         .environment(appSettings)
