@@ -11,6 +11,8 @@ struct BatonApp: App {
     @State private var deviceStore: DeviceStore
     @State private var appSettings: AppSettings
     @State private var sleepHandler: SleepHandler
+    /// bluetoothd が起動し直したことに気づいて、Baton を起動し直す（#51）
+    @State private var daemonWatcher: BluetoothDaemonWatcher
 
     init() {
         Logger.app.notice("起動（Bluetooth：\(BluetoothServiceFactory.usesMock ? "ダミー" : "本物", privacy: .public)）")
@@ -28,6 +30,17 @@ struct BatonApp: App {
             deviceStore: deviceStore,
             settings: appSettings
         ))
+
+        // 電池切れの深いスリープから起きると bluetoothd が起動し直し、Baton の中の Bluetooth の部品が
+        // 機器の情報を正しく持てなくなるので、起動し直す（#51）。ダミーの Bluetooth のとき（テスト、Mock のスキーム）は見張らない
+        let daemonWatcher = BluetoothDaemonWatcher()
+        daemonWatcher.onRestartNeeded = {
+            AppRelauncher.relaunch(reason: "bluetoothd が起動し直した")
+        }
+        if !BluetoothServiceFactory.usesMock {
+            daemonWatcher.start()
+        }
+        _daemonWatcher = State(initialValue: daemonWatcher)
     }
 
     var body: some Scene {
