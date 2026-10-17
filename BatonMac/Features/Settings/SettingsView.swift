@@ -66,10 +66,9 @@ struct SettingsView: View {
 
         VStack(alignment: .leading, spacing: 6) {
             // オン＝音が止まるまで待ってから切断する（waitsForAudioToStop）。止まったら切断するので、ずっと維持するわけではない
+            // 説明の文は置かない（見た目をすっきりさせるため。2026-10-17 にユーザーが決定）。
+            // 動き：ロック・画面の消灯のときに音が出ていれば切断せず、音が止まって30秒経ってから切断する
             settingSwitch("再生中は接続を維持", isOn: $settings.waitsForAudioToStop)
-            if settings.waitsForAudioToStop {
-                sectionNote("ロック・画面の消灯の際に音声が出力されていた場合、切断せずに接続を維持します。\n音声が止まって30秒経ってから切断します。")
-            }
         }
     }
 
