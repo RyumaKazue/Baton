@@ -82,6 +82,18 @@ final class DeviceStore {
         bluetooth.resync()
     }
 
+    /// 登録機器の接続状態のまとめ（メニューバーのアイコンで表す。#58）
+    var connectionSummary: ConnectionSummary {
+        let addresses = registeredDevices.map(\.address)
+        if addresses.contains(where: { operations[$0] != nil }) {
+            return .busy
+        }
+        if addresses.contains(where: { isConnected($0) }) {
+            return .connected
+        }
+        return .disconnected
+    }
+
     /// その機器から、今、音が出ているか（AudioOutputService に聞く）
     func isPlaying(_ address: BluetoothAddress) -> Bool {
         audioOutput.isPlaying(on: address)
@@ -266,6 +278,16 @@ final class DeviceStore {
         }
         return devices
     }
+}
+
+/// 登録機器の接続状態のまとめ（メニューバーのアイコンで表す）
+enum ConnectionSummary: Equatable {
+    /// 登録機器はどれもこの Mac につながっていない（登録機器がないときも含む）
+    case disconnected
+    /// 登録機器のどれかがこの Mac につながっている
+    case connected
+    /// 登録機器のどれかが、接続・切断の途中
+    case busy
 }
 
 /// 機器に対して実行中の操作

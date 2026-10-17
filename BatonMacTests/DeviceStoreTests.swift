@@ -194,6 +194,43 @@ struct DeviceStoreTests {
         #expect(store.isConnected(earphones))
     }
 
+    // MARK: - 接続状態のまとめ（メニューバーのアイコン。#58）
+
+    @Test("登録機器がなければ、未接続")
+    func summaryWithoutRegisteredDevices() {
+        let store = makeStore()  // ヘッドホンは接続中だが、登録していない
+        #expect(store.connectionSummary == .disconnected)
+    }
+
+    @Test("登録機器のどれかがつながっていれば、接続中")
+    func summaryConnected() throws {
+        let store = makeStore()
+        store.register(try pairedDevice(earphones))   // 未接続
+        store.register(try pairedDevice(headphones))  // 接続中
+        #expect(store.connectionSummary == .connected)
+    }
+
+    @Test("登録機器がどれもつながっていなければ、未接続")
+    func summaryDisconnected() throws {
+        let store = makeStore()
+        store.register(try pairedDevice(earphones))
+        #expect(store.connectionSummary == .disconnected)
+    }
+
+    @Test("登録機器のどれかが接続・切断の途中なら、操作中")
+    func summaryBusy() async throws {
+        let slowBluetooth = MockBluetoothService(connectionDelay: .milliseconds(200), disconnectionDelay: .zero)
+        let store = DeviceStore(bluetooth: slowBluetooth, audioOutput: MockAudioOutputService(), defaults: defaults)
+        store.register(try #require(slowBluetooth.pairedAudioDevices().first { $0.address == earphones }))
+
+        let task = Task { await store.connect(earphones) }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(store.connectionSummary == .busy)
+
+        await task.value
+        #expect(store.connectionSummary == .connected)
+    }
+
     // MARK: - 読み直し（通知が届かなかったとき。#51）
 
     @Test("通知が届かずにつながっていた機器は、読み直すと接続中になる")
