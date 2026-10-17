@@ -51,17 +51,12 @@ struct SettingsView: View {
         // @Environment で受け取った値から、スイッチに渡す Binding（$settings.〜）を作るために @Bindable にする
         @Bindable var settings = appSettings
 
+        // 説明の文は「再生中は接続を維持」の下だけに置く（見た目をすっきりさせるため。2026-10-17 にユーザーが決定）
         VStack(alignment: .leading, spacing: 6) {
             sectionHeader("切断するタイミング")
-            sectionNote("他の端末ですぐ使えるように切断し、戻ってきたらつなぎ直します")
             settingSwitch("画面をロックしたとき", isOn: $settings.disconnectsOnScreenLock)
             settingSwitch("スリープしたとき", isOn: $settings.disconnectsOnSleep)
             settingSwitch("画面が消えたとき", isOn: $settings.disconnectsOnDisplaySleep)
-            if !settings.disconnectsOnScreenLock {
-                // ヘッドホンがつながっている間は Mac が自動でスリープしないことがあり（仕様書 7）、
-                // 電源ボタンで離れても切断されなくなるため
-                sectionNote("ヘッドホンがつながっている間は、Mac が自動でスリープしないことがあります")
-            }
         }
 
         VStack(alignment: .leading, spacing: 6) {
