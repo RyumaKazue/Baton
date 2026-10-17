@@ -44,12 +44,15 @@ struct BatonApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Baton", systemImage: "headphones") {
+        MenuBarExtra {
             MenuContentView()
                 .environment(loginItemStore)
                 .environment(deviceStore)
                 .environment(appSettings)
                 .environment(sleepHandler)
+        } label: {
+            // 登録機器の接続状態に合わせて、アイコンが変わる（DeviceStore は @Observable なので、変化に合わせて描き直される）
+            MenuBarIcon(summary: deviceStore.connectionSummary)
         }
         // .window：メニューを普通のメニューではなく、小さなウィンドウ（ポップオーバー）として表示する。
         // 機器ごとの接続状態やボタンを並べるため、自由にレイアウトできるこちらを使う。
