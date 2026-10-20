@@ -65,7 +65,7 @@ struct MenuContentView: View {
 
             Divider()
 
-            Button("Baton を終了") {
+            Button("\(AppInfo.displayName)を終了") {
                 // Dock にアイコンがないので、アプリを終了する手段はこのボタンだけになる
                 NSApplication.shared.terminate(nil)
             }
@@ -78,7 +78,7 @@ struct MenuContentView: View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("Baton")
+                    Text(AppInfo.displayName)
                         .font(.headline)
                     Text(Self.version)
                         .font(.caption)

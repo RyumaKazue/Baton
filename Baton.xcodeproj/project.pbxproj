@@ -23,7 +23,7 @@
 
 /* Begin PBXFileReference section */
 		1832B3DB306A99F500B8DADB /* BatonPhone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BatonPhone.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		186C1B72306A870200ADD6CC /* Baton.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Baton.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		186C1B72306A870200ADD6CC /* AutoConnect.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AutoConnect.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		186C1B83306A870500ADD6CC /* BatonKit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = BatonKit; path = Packages/BatonKit; sourceTree = "<group>"; };
 		1A5E00000000000000000002 /* BatonMacTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BatonMacTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -95,7 +95,7 @@
 		186C1B73306A870200ADD6CC /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				186C1B72306A870200ADD6CC /* Baton.app */,
+				186C1B72306A870200ADD6CC /* AutoConnect.app */,
 				1832B3DB306A99F500B8DADB /* BatonPhone.app */,
 				1A5E00000000000000000002 /* BatonMacTests.xctest */,
 			);
@@ -148,7 +148,7 @@
 				186C1B81306A870500ADD6CC /* BatonKit */,
 			);
 			productName = BatonMac;
-			productReference = 186C1B72306A870200ADD6CC /* Baton.app */;
+			productReference = 186C1B72306A870200ADD6CC /* AutoConnect.app */;
 			productType = "com.apple.product-type.application";
 		};
 		1A5E00000000000000000001 /* BatonMacTests */ = {
@@ -201,6 +201,7 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				ja,
 				Base,
 			);
 			mainGroup = 186C1B69306A870100ADD6CC;
@@ -481,6 +482,7 @@
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = AutoConnect;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "登録した Bluetooth 機器の接続と切断に使用します。";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -490,7 +492,8 @@
 				);
 				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.furiel05.AudioAutoConnect;
-				PRODUCT_NAME = Baton;
+				PRODUCT_MODULE_NAME = Baton;
+				PRODUCT_NAME = AutoConnect;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -516,6 +519,7 @@
 				ENABLE_RESOURCE_ACCESS_BLUETOOTH = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = AutoConnect;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "登録した Bluetooth 機器の接続と切断に使用します。";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -525,7 +529,8 @@
 				);
 				MARKETING_VERSION = 0.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.furiel05.AudioAutoConnect;
-				PRODUCT_NAME = Baton;
+				PRODUCT_MODULE_NAME = Baton;
+				PRODUCT_NAME = AutoConnect;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -553,7 +558,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Baton.app/Contents/MacOS/Baton";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AutoConnect.app/Contents/MacOS/AutoConnect";
 			};
 			name = Debug;
 		};
@@ -574,7 +579,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Baton.app/Contents/MacOS/Baton";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/AutoConnect.app/Contents/MacOS/AutoConnect";
 			};
 			name = Release;
 		};

@@ -1,6 +1,8 @@
-# Baton
+# オーディオ機器自動接続（AutoConnect）
 
-1台の Bluetooth 機器（イヤホンなど）を、複数の Mac・iPhone で切り替えて使うためのアプリです。
+Mac から離れるとイヤホン・ヘッドホンを自動で切断し、戻ってきたら接続し直すアプリです。アプリの名前は、日本語の Mac では「オーディオ機器自動接続」、英語の Mac では「AutoConnect」と表示されます。コードの中では、開発を始めたときの名前「Baton」を使っています（BatonMac、BatonKit など）。
+
+将来は、1台の Bluetooth 機器（イヤホンなど）を、複数の Mac・iPhone で切り替えて使えるようにすることを目指しています。
 
 これまで「使っていた端末で切断 → 使いたい端末で接続」と2か所で操作していたのを、**使いたい端末で操作するだけ**で済むようにします。
 
@@ -11,7 +13,7 @@
 ### v0.1（この Mac だけで完結する機能）
 
 - メニューバーに常駐する（Dock には出ない）。ログイン時に自動で起動できる
-- ペアリング済みの音声機器から、Baton で管理する機器を登録する
+- ペアリング済みの音声機器から、このアプリで管理する機器を登録する
 - 登録した機器を、メニューから接続・切断する。この Mac に接続中かを表示する
 - スリープに入るとき・画面をロックしたときに、接続中の機器を切断する
 - 戻ってきたとき（ロックを解除したとき）に、離れる前に使っていた機器を再接続する
@@ -48,7 +50,7 @@
 ## リポジトリの構成
 
 ```
-Baton/
+audio-autoconnect/
 ├── Baton.xcodeproj           # Xcode のプロジェクト（ターゲット：BatonMac、BatonPhone）
 ├── BatonMac/                 # Mac アプリ
 ├── BatonMacTests/            # Mac アプリのテスト
@@ -68,7 +70,7 @@ Baton/
 git clone https://github.com/furiel05/audio-autoconnect.git
 ```
 ```bash
-open Baton/Baton.xcodeproj
+open audio-autoconnect/Baton.xcodeproj
 ```
 
 ### 2. 署名の設定
@@ -86,8 +88,8 @@ Release でビルドしたアプリを、「アプリケーション」フォル
 スクリプトは、次のことを行います。
 
 1. Release でビルドする
-2. 動いている Baton（Xcode から起動したものも含む）を終了する
-3. `/Applications/Baton.app` に入れて、起動する
+2. 動いているアプリ（Xcode から起動したものも含む）を終了する
+3. `/Applications/AutoConnect.app` に入れて、起動する（名前を変える前の `/Applications/Baton.app` が残っていたら、取り除く）
 
 インストールした後に、メニューの「ログイン時に起動」をオンにすると、ログインしたときに自動で起動します。
 
