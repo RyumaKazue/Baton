@@ -16,7 +16,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "186C1B71306A870200ADD6CC"
-               BuildableName = "Baton.app"
+               BuildableName = "AutoConnect.app"
                BlueprintName = "BatonMac"
                ReferencedContainer = "container:Baton.xcodeproj">
             </BuildableReference>
@@ -74,7 +74,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "186C1B71306A870200ADD6CC"
-            BuildableName = "Baton.app"
+            BuildableName = "AutoConnect.app"
             BlueprintName = "BatonMac"
             ReferencedContainer = "container:Baton.xcodeproj">
          </BuildableReference>
@@ -91,7 +91,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "186C1B71306A870200ADD6CC"
-            BuildableName = "Baton.app"
+            BuildableName = "AutoConnect.app"
             BlueprintName = "BatonMac"
             ReferencedContainer = "container:Baton.xcodeproj">
          </BuildableReference>

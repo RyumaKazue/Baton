@@ -98,7 +98,7 @@ struct DeviceRegistrationView: View {
                 .foregroundStyle(.secondary)
             Text("ペアリング済みの音声機器が見つかりません")
                 .font(.headline)
-            Text("システム設定の Bluetooth で、機器がこの Mac とペアリングされているか確認してください。ペアリング済みなのに表示されない場合は、Baton に Bluetooth の使用が許可されているか確認してください。")
+            Text("システム設定の Bluetooth で、機器がこの Mac とペアリングされているか確認してください。ペアリング済みなのに表示されない場合は、「\(AppInfo.displayName)」に Bluetooth の使用が許可されているか確認してください。")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

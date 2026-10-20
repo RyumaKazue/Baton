@@ -26,9 +26,9 @@ struct MenuBarIcon: View {
     /// 読み上げ（VoiceOver）で使う説明
     static func accessibilityLabel(for summary: ConnectionSummary) -> String {
         switch summary {
-        case .disconnected: "Baton：未接続"
-        case .connected: "Baton：接続中"
-        case .busy: "Baton：接続・切断中"
+        case .disconnected: "\(AppInfo.displayName)：未接続"
+        case .connected: "\(AppInfo.displayName)：接続中"
+        case .busy: "\(AppInfo.displayName)：接続・切断中"
         }
     }
 }
