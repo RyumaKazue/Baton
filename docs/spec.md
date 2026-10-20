@@ -80,7 +80,7 @@ MVPの範囲は [mvp.md](mvp.md) を参照。
 ### 5.3 端末の表示名
 
 - 各端末は表示名を持ち、接続状態の表示・エラーメッセージ・ペアリング済み端末の一覧で使う
-- Macの初期値はコンピュータ名（システム設定 > 一般 > 共有 で設定する名前。例：「RyumaのMacBook Air」）
+- Macの初期値はコンピュータ名（システム設定 > 一般 > 共有 で設定する名前。例：「山田のMacBook Air」）
 - iPhoneの初期値は「iPhone」（iOS 16以降、アプリから端末名を取得できないため）
 - アプリの設定で任意の名前（「Mac1」「仕事用」など）に変更できる
 - 重複の防止
@@ -367,8 +367,8 @@ Baton/
 
 | ターゲット | 対象 | アプリ名 | Bundle ID |
 |---|---|---|---|
-| BatonMac | macOS | Baton | `Kazue.Baton` |
-| BatonPhone | iOS | BatonPhone（`Baton` への変更を検討中） | `Kazue.BatonPhone` |
+| BatonMac | macOS | Baton | `com.furiel05.AudioAutoConnect` |
+| BatonPhone | iOS | BatonPhone（`Baton` への変更を検討中） | `com.furiel05.AudioAutoConnect.iOS` |
 
 ### 13.2 コードの置き場所
 

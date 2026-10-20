@@ -16,7 +16,7 @@ xcodebuild -project Baton.xcodeproj -scheme BatonMac -destination 'platform=macO
 
 echo "==> 動いている Baton を終了する"
 # Xcode から起動したものも含めて終了する（同じアプリが2つ動くと、メニューバーのアイコンが2つになるため）
-osascript -e 'tell application id "Kazue.Baton" to quit' 2>/dev/null || true
+osascript -e 'tell application id "com.furiel05.AudioAutoConnect" to quit' 2>/dev/null || true
 sleep 1
 
 echo "==> $INSTALLED_APP に入れる"

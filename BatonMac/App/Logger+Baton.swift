@@ -10,7 +10,7 @@ import os
 ///
 /// 機器の名前やアドレスは、自分の Mac の中だけで見るログなので、伏せずに出す（privacy: .public）。
 extension Logger {
-    private static let subsystem = Bundle.main.bundleIdentifier ?? "Kazue.Baton"
+    private static let subsystem = Bundle.main.bundleIdentifier ?? "com.furiel05.AudioAutoConnect"
 
     /// アプリ全体（起動など）
     static let app = Logger(subsystem: subsystem, category: "App")

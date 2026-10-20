@@ -56,7 +56,7 @@ v0.2 の途中で、ほかに入れたもの
 | CI でのテスト | テストの本体（Baton.app）が本物の Bluetooth に触ると、CI で許可のダイアログが出て止まる。`BatonMac` スキームの Test では `BATON_MOCK_BLUETOOTH=1` を渡している |
 | 同じアプリが2つ | Xcode から起動した開発中のアプリと、`/Applications` のアプリを同時に動かさない（同じ Bundle ID。メニューバーのアイコンが2つになり、両方がスリープ時の処理をする） |
 | 検証用のブランチ | `spike/iobluetooth`、`spike/40-dark-wake-disconnect`、`spike/51-relaunch-on-bluetooth-reset` はローカルにだけある（main にはマージしない） |
-| ログの混ざり | `subsystem == "Kazue.Baton"` のログには、テストの実行（ダミー）のログも混ざる。調べるときは `processID` で絞る。ログは数日で消える |
+| ログの混ざり | `subsystem == "com.furiel05.AudioAutoConnect"` のログには、テストの実行（ダミー）のログも混ざる。調べるときは `processID` で絞る。ログは数日で消える |
 | Bluetooth が急に動かない | まず bluetoothd が起動し直していないか（`ps -o lstart -p $(pgrep -x bluetoothd)`、`pmset -g log` の `Wake from Hibernate`）と、bluetoothd 側のログ（`ACL connected ... status`）を見る。ヘッドホンの電源が切れていただけ、ということもあった |
 
 ## 6. 次の会話で最初にやること

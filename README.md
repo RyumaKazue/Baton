@@ -65,7 +65,7 @@ Baton/
 ### 1. clone して開く
 
 ```bash
-git clone https://github.com/RyumaKazue/Baton.git
+git clone https://github.com/furiel05/audio-autoconnect.git
 ```
 ```bash
 open Baton/Baton.xcodeproj
@@ -131,7 +131,7 @@ swift test --package-path Packages/BatonKit
 
 ## ログを見る
 
-Baton は、macOS の統合ログにログを書き込みます（サブシステム `Kazue.Baton`）。
+Baton は、macOS の統合ログにログを書き込みます（サブシステム `com.furiel05.AudioAutoConnect`）。
 
 | カテゴリ | 内容 |
 |---|---|
@@ -144,7 +144,7 @@ Baton は、macOS の統合ログにログを書き込みます（サブシス�
 ### Console.app で見る
 
 1. Console.app（コンソール）を開き、左で自分の Mac を選ぶ
-2. 右上の検索欄に `subsystem:Kazue.Baton` と入力する
+2. 右上の検索欄に `subsystem:com.furiel05.AudioAutoConnect` と入力する
 3. 「開始」を押すと、その後のログが流れる
 
 ### ターミナルで見る
@@ -154,13 +154,13 @@ zsh には `log` という別の組み込みコマンドがあるので、`/usr/
 これから出るログを見る：
 
 ```bash
-/usr/bin/log stream --predicate 'subsystem == "Kazue.Baton"'
+/usr/bin/log stream --predicate 'subsystem == "com.furiel05.AudioAutoConnect"'
 ```
 
 過去1時間のログを見る：
 
 ```bash
-/usr/bin/log show --last 1h --predicate 'subsystem == "Kazue.Baton"'
+/usr/bin/log show --last 1h --predicate 'subsystem == "com.furiel05.AudioAutoConnect"'
 ```
 
 ## 開発の進め方
