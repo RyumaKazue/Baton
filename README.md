@@ -65,7 +65,7 @@ Baton/
 ### 1. clone して開く
 
 ```bash
-git clone https://github.com/furiel05/Baton.git
+git clone https://github.com/furiel05/audio-autoconnect.git
 ```
 ```bash
 open Baton/Baton.xcodeproj
