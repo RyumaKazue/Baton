@@ -77,10 +77,13 @@ Apple の「Describing use of required reason API」の本文では、required r
 
 Baton は UserDefaults（登録機器と設定の保存）を使っている。UserDefaults は required reason API の1つで、アプリだけが読み書きする場合の理由は `CA92.1`。macOS では必須ではないが、将来 macOS も対象になったときのために、入れておく。
 
-## 5. 決めること
+## 5. 決めたこと（2026-10-20）
 
-1. 4.1 の3つの文字列を、A（そのまま出す）と B（公開のものだけにする）のどちらにするか
-2. プライバシーマニフェストを入れること（おすすめ）
+| 項目 | 決定 |
+|---|---|
+| 4.1 の3つの文字列 | **A：そのまま出す**。審査で断られたら、B（公開のものだけにする）に変える |
+| 自分で起動し直す | そのまま。審査の担当者向けの説明に理由を書く（#67） |
+| プライバシーマニフェスト | 入れる（`BatonMac/Resources/PrivacyInfo.xcprivacy`。UserDefaults、`CA92.1`） |
 
 ## 6. 参考
 
